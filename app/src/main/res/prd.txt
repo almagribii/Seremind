@@ -1,0 +1,754 @@
+Aplikasi: SEREMIND
+
+0. Nama Aplikasi
+Seremind — gabungan dari Serenity (ketenangan) dan Mind (pikiran).
+
+Arti: Pikiran yang tenang.
+
+Tagline: Seremind — Tenang Sebelum Bertindak.
+
+Filosofi nama:
+
+Kami memilih nama Seremind karena kami percaya bahwa akar dari kebiasaan digital yang tidak sehat bukanlah kurangnya disiplin, melainkan kurangnya ketenangan pikiran. Ketika pikiran tenang, kita bisa memilih. Ketika pikiran kacau, kita hanya bereaksi. Seremind hadir untuk menciptakan ruang tenang itu — tepat di momen sebelum kebiasaan otomatis mengambil alih.
+
+1. Latar Belakang & Masalah
+1.1 Konteks
+Penggunaan smartphone telah menjadi bagian tak terpisahkan dari kehidupan sehari-hari. Namun, pola penggunaan yang didominasi oleh aplikasi dengan stimulasi tinggi — media sosial, video pendek, game — telah menciptakan kebiasaan otomatis yang sulit diinterupsi.
+
+Riset neurosains terbaru dari UCL menemukan bahwa otak memiliki dua sistem pembelajaran dopamin yang bekerja paralel:
+
+Reward Prediction Error (RPE): sinyal yang muncul ketika hasil lebih baik atau lebih buruk dari yang diharapkan.
+
+Action Prediction Error (APE): sinyal yang mengupdate seberapa sering suatu aksi dilakukan, terlepas dari nilainya.
+
+Kebiasaan buruk seperti doomscrolling tidak dikendalikan oleh RPE, melainkan oleh APE. Pengguna tidak scroll karena mengharapkan reward tertentu. Mereka scroll karena aksi itu sudah menjadi default policy — otak telah menghemat resources dengan menjadikannya kebiasaan otomatis.
+
+1.2 Masalah
+Aplikasi pemblokir yang ada saat ini mencoba menyerang RPE — dengan memberi reward atau punishment. Padahal yang harus diserang adalah APE. Akibatnya, kebanyakan aplikasi pemblokir gagal karena:
+
+Fokus pada pemblokiran, bukan interupsi kebiasaan
+
+Tidak membantu pengguna memahami mengapa kebiasaan itu terjadi
+
+Menghukum pengguna ketika gagal, bukan membantu mereka pulih
+
+Tidak memberikan jeda reflektif di momen sebelum kebiasaan terjadi
+
+Tidak membantu pengguna memahami hubungan antara emosi dan kebiasaan
+
+1.3 Peluang
+Ada celah untuk aplikasi yang:
+
+Menginterupsi kebiasaan otomatis di momen paling kritis — sebelum aksi terjadi
+
+Membantu pengguna menyadari pola pemicu tanpa menghakimi
+
+Memberikan konteks ilmiah mengapa kebiasaan itu sulit diubah
+
+Menyediakan ruang refleksi (jurnal) yang menghubungkan emosi dengan kebiasaan
+
+Menyimpan data secara lokal untuk menjaga privasi
+
+2. Tujuan Produk
+2.1 Tujuan Utama
+Membantu pengguna menyadari dan menginterupsi kebiasaan membuka aplikasi secara otomatis, dengan cara menambahkan jeda reflektif di momen sebelum kebiasaan itu terjadi — bukan dengan memblokir, tapi dengan mengembalikan kendali kepada pengguna.
+
+2.2 Tujuan Spesifik
+Menyediakan mekanisme jeda (delay-to-open) sebelum aplikasi target dibuka
+
+Mencatat dan menganalisis pola pemicu pembukaan aplikasi
+
+Memberikan pertanyaan reflektif yang dipersonalisasi berdasarkan pola historis
+
+Menyediakan jurnal wellness yang menghubungkan emosi dengan kebiasaan digital
+
+Menyediakan artikel edukasi pendukung tentang dopamin dan kebiasaan
+
+Menjaga privasi pengguna dengan menyimpan semua data secara lokal
+
+2.3 Metrik Keberhasilan
+Metrik	Target
+Pengguna yang menyelesaikan onboarding	> 80%
+Rata-rata pembukaan aplikasi target per hari	Menurun dalam 7 hari
+Rasio "Batalkan" vs "Buka" di overlay	> 30% batalkan
+Pengguna yang menulis minimal 1 entri jurnal	> 50%
+Pengguna yang membaca minimal 1 artikel	> 50%
+Retensi pengguna setelah 14 hari	> 40%
+3. Target Pengguna
+3.1 Pengguna Utama
+Mahasiswa (18–24 tahun) yang merasa sulit lepas dari media sosial
+
+Pekerja muda (25–35 tahun) yang ingin mengurangi doomscrolling
+
+Siapa pun yang menyadari kebiasaan buka HP berlebihan tapi tidak tahu cara menghentikannya
+
+3.2 Karakteristik Pengguna
+Memiliki smartphone Android (minimal Android 8.0)
+
+Sadar bahwa mereka punya kebiasaan buka aplikasi berlebihan
+
+Mau mencoba alat bantu, tapi tidak mau dipaksa atau dihakimi
+
+Peduli privasi dan tidak mau data perilakunya dikirim ke server
+
+3.3 Kebutuhan Pengguna
+Kebutuhan	Deskripsi
+Kesadaran	Ingin tahu kapan dan mengapa mereka membuka aplikasi
+Kendali	Ingin bisa memilih untuk tidak membuka, tanpa dipaksa
+Pemahaman	Ingin mengerti mengapa kebiasaan itu sulit diubah
+Refleksi	Ingin ruang untuk memahami perasaan dan pikirannya
+Empati	Tidak ingin dihakimi ketika gagal
+Privasi	Tidak ingin data perilakunya dikirim ke mana pun
+4. Lingkup Produk
+4.1 Dalam Lingkup (In Scope)
+Aplikasi Android native (Kotlin + Jetpack Compose)
+
+Deteksi aplikasi foreground via UsageStats API
+
+Overlay jeda dengan pertanyaan reflektif
+
+Pencatatan pola dan statistik lokal
+
+Jurnal wellness dengan mood tracking
+
+Artikel edukasi offline
+
+Integrasi Gemini API untuk personalisasi dan insight
+
+Onboarding dan pengaturan izin
+
+4.2 Di Luar Lingkup (Out of Scope)
+Aplikasi iOS
+
+Sinkronisasi cloud
+
+Akun pengguna dan login
+
+Fitur sosial (komunitas, berbagi, leaderboard)
+
+Pemblokiran paksa (hanya jeda, bukan blokir)
+
+Diagnosis kesehatan mental
+
+Terapi atau intervensi klinis
+
+5. Arsitektur Teknis
+5.1 Stack Teknologi
+Komponen	Teknologi
+Bahasa	Kotlin
+UI Framework	Jetpack Compose
+Arsitektur	MVVM (Model-View-ViewModel)
+Database	Room (SQLite)
+AI	Gemini API (Google AI)
+Background Service	Foreground Service
+Overlay	WindowManager (TYPE_APPLICATION_OVERLAY)
+Navigasi	Navigation Compose
+5.2 Izin yang Dibutuhkan
+Izin	Kegunaan	Cara Aktivasi
+PACKAGE_USAGE_STATS	Deteksi aplikasi foreground	Settings > Special App Access > Usage Access
+SYSTEM_ALERT_WINDOW	Menampilkan overlay	Settings > Special App Access > Display over other apps
+FOREGROUND_SERVICE	Service yang selalu berjalan	Otomatis saat service dimulai
+POST_NOTIFICATIONS	Notifikasi foreground service	Dialog izin saat pertama kali
+5.3 Alur Data
+text
+User membuka aplikasi target
+        ↓
+Foreground Service mendeteksi via UsageStats
+        ↓
+Overlay muncul dengan pertanyaan (dari Gemini atau fallback)
+        ↓
+User memilih alasan / Batalkan / Buka / Tulis refleksi
+        ↓
+Data dicatat ke Room Database
+        ↓
+User menulis di jurnal (opsional)
+        ↓
+Data agregat dikirim ke Gemini untuk insight (opsional, minimal)
+        ↓
+Insight ditampilkan di Beranda dan Statistik
+5.4 Struktur Database (Room)
+Tabel: app_targets
+
+Kolom	Tipe	Deskripsi
+id	Int (PK)	ID unik
+package_name	String	Nama package aplikasi
+app_name	String	Nama tampilan aplikasi
+is_active	Boolean	Apakah dijeda
+delay_seconds	Int	Durasi jeda
+Tabel: gate_events
+
+Kolom	Tipe	Deskripsi
+id	Int (PK)	ID unik
+package_name	String	Aplikasi yang dibuka
+timestamp	Long	Waktu kejadian
+reason	String	Alasan yang dipilih
+action	String	"opened" atau "cancelled"
+ai_question	String?	Pertanyaan dari AI (jika ada)
+Tabel: recovery_events
+
+Kolom	Tipe	Deskripsi
+id	Int (PK)	ID unik
+timestamp	Long	Waktu kejadian
+emotion	String	Emosi yang dipilih
+ai_response	String?	Respons dari AI
+Tabel: journal_entries
+
+Kolom	Tipe	Deskripsi
+id	Int (PK)	ID unik
+timestamp	Long	Waktu entri dibuat
+content	String	Isi tulisan user
+emotion_tag	String?	Tag emosi (senang, sedih, cemas, tenang, dsb)
+entry_type	String	"free", "gate_reflection", "recovery_reflection", "daily_prompt", "weekly_summary"
+related_gate_id	Int?	ID gate event terkait (jika ada)
+ai_prompt	String?	Pertanyaan dari AI yang memicu entri
+Tabel: articles
+
+Kolom	Tipe	Deskripsi
+id	Int (PK)	ID unik
+title	String	Judul artikel
+content	String	Isi artikel
+is_read	Boolean	Sudah dibaca
+Tabel: user_preferences
+
+Kolom	Tipe	Deskripsi
+key	String (PK)	Nama preferensi
+value	String	Nilai preferensi
+5.5 Entity: AppTarget
+kotlin
+@Entity(tableName = "app_targets")
+data class AppTarget(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    @ColumnInfo(name = "package_name") val packageName: String,
+    @ColumnInfo(name = "app_name") val appName: String,
+    @ColumnInfo(name = "is_active") val isActive: Boolean = true,
+    @ColumnInfo(name = "delay_seconds") val delaySeconds: Int = 5
+)
+5.6 Entity: GateEvent
+kotlin
+@Entity(tableName = "gate_events")
+data class GateEvent(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    @ColumnInfo(name = "package_name") val packageName: String,
+    @ColumnInfo(name = "timestamp") val timestamp: Long,
+    @ColumnInfo(name = "reason") val reason: String,
+    @ColumnInfo(name = "action") val action: String,
+    @ColumnInfo(name = "ai_question") val aiQuestion: String? = null
+)
+5.7 Entity: RecoveryEvent
+kotlin
+@Entity(tableName = "recovery_events")
+data class RecoveryEvent(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    @ColumnInfo(name = "timestamp") val timestamp: Long,
+    @ColumnInfo(name = "emotion") val emotion: String,
+    @ColumnInfo(name = "ai_response") val aiResponse: String? = null
+)
+5.8 Entity: JournalEntry
+kotlin
+@Entity(tableName = "journal_entries")
+data class JournalEntry(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    @ColumnInfo(name = "timestamp") val timestamp: Long,
+    @ColumnInfo(name = "content") val content: String,
+    @ColumnInfo(name = "emotion_tag") val emotionTag: String? = null,
+    @ColumnInfo(name = "entry_type") val entryType: String,
+    @ColumnInfo(name = "related_gate_id") val relatedGateId: Int? = null,
+    @ColumnInfo(name = "ai_prompt") val aiPrompt: String? = null
+)
+5.9 Entity: Article
+kotlin
+@Entity(tableName = "articles")
+data class Article(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    @ColumnInfo(name = "title") val title: String,
+    @ColumnInfo(name = "content") val content: String,
+    @ColumnInfo(name = "is_read") val isRead: Boolean = false
+)
+5.10 Entity: UserPreference
+kotlin
+@Entity(tableName = "user_preferences")
+data class UserPreference(
+    @PrimaryKey val key: String,
+    @ColumnInfo(name = "value") val value: String
+)
+5.11 DAO: GateEventDao
+kotlin
+@Dao
+interface GateEventDao {
+    @Insert
+    suspend fun insert(event: GateEvent)
+
+    @Query("SELECT * FROM gate_events WHERE timestamp >= :startTime ORDER BY timestamp DESC")
+    suspend fun getEventsSince(startTime: Long): List<GateEvent>
+
+    @Query("SELECT COUNT(*) FROM gate_events WHERE action = 'cancelled' AND timestamp >= :startTime")
+    suspend fun getCancelledCount(startTime: Long): Int
+
+    @Query("SELECT COUNT(*) FROM gate_events WHERE action = 'opened' AND timestamp >= :startTime")
+    suspend fun getOpenedCount(startTime: Long): Int
+
+    @Query("SELECT reason, COUNT(*) as count FROM gate_events WHERE timestamp >= :startTime GROUP BY reason ORDER BY count DESC")
+    suspend fun getReasonDistribution(startTime: Long): List<ReasonCount>
+
+    @Query("SELECT strftime('%H', timestamp / 1000, 'unixepoch') as hour, COUNT(*) as count FROM gate_events WHERE timestamp >= :startTime GROUP BY hour ORDER BY hour")
+    suspend fun getHourlyDistribution(startTime: Long): List<HourCount>
+}
+5.12 DAO: JournalEntryDao
+kotlin
+@Dao
+interface JournalEntryDao {
+    @Insert
+    suspend fun insert(entry: JournalEntry)
+
+    @Update
+    suspend fun update(entry: JournalEntry)
+
+    @Delete
+    suspend fun delete(entry: JournalEntry)
+
+    @Query("SELECT * FROM journal_entries ORDER BY timestamp DESC")
+    suspend fun getAllEntries(): List<JournalEntry>
+
+    @Query("SELECT * FROM journal_entries WHERE timestamp >= :startTime ORDER BY timestamp DESC")
+    suspend fun getEntriesSince(startTime: Long): List<JournalEntry>
+
+    @Query("SELECT * FROM journal_entries WHERE emotion_tag = :emotion ORDER BY timestamp DESC")
+    suspend fun getEntriesByEmotion(emotion: String): List<JournalEntry>
+
+    @Query("SELECT * FROM journal_entries WHERE content LIKE '%' || :query || '%' ORDER BY timestamp DESC")
+    suspend fun searchEntries(query: String): List<JournalEntry>
+
+    @Query("SELECT emotion_tag, COUNT(*) as count FROM journal_entries WHERE timestamp >= :startTime AND emotion_tag IS NOT NULL GROUP BY emotion_tag ORDER BY count DESC")
+    suspend fun getEmotionDistribution(startTime: Long): List<EmotionCount>
+}
+5.13 DAO: AppTargetDao
+kotlin
+@Dao
+interface AppTargetDao {
+    @Insert
+    suspend fun insert(target: AppTarget)
+
+    @Update
+    suspend fun update(target: AppTarget)
+
+    @Delete
+    suspend fun delete(target: AppTarget)
+
+    @Query("SELECT * FROM app_targets WHERE is_active = 1")
+    suspend fun getActiveTargets(): List<AppTarget>
+
+    @Query("SELECT * FROM app_targets WHERE package_name = :packageName LIMIT 1")
+    suspend fun getTargetByPackage(packageName: String): AppTarget?
+
+    @Query("SELECT * FROM app_targets")
+    suspend fun getAllTargets(): List<AppTarget>
+}
+6. Fitur per Screen
+6.1 Navigasi Utama
+Bottom navigation dengan 5 item:
+
+Beranda
+
+Statistik
+
+Aplikasi
+
+Jurnal (dengan tab "Tulisanku" dan "Bacaan")
+
+Pengaturan
+
+Layar khusus (di luar navigasi):
+
+Onboarding
+
+Overlay Gerbang
+
+Layar Pemulihan
+
+6.2 Onboarding
+Fitur	Deskripsi	Prioritas
+Penjelasan konsep	Apa itu Seremind, kenapa perlu	Tinggi
+Minta izin Usage Access	Tombol yang membuka Settings	Tinggi
+Minta izin Overlay	Tombol yang membuka Settings	Tinggi
+Minta izin Notifikasi	Untuk foreground service	Tinggi
+Pilih aplikasi awal	Preset media sosial	Sedang
+Atur durasi jeda awal	Slider default 5 detik	Sedang
+Selesai	Masuk ke Beranda	Tinggi
+6.3 Beranda
+Fitur	Deskripsi	Prioritas
+Sapaan & tanggal	"Selamat pagi" + tanggal hari ini	Rendah
+Kartu ringkasan	Jumlah pembukaan hari ini, rasio berhasil vs lanjut	Tinggi
+Kartu momen rawan	Jam paling sering buka aplikasi	Tinggi
+Kartu aplikasi teratas	3 aplikasi paling sering dibuka hari ini	Sedang
+Kartu refleksi singkat	Pertanyaan dari Gemini + tombol jawab (masuk ke jurnal)	Sedang
+Akses cepat ke Jurnal	Tombol "Tulis di Jurnal"	Sedang
+6.4 Statistik
+Fitur	Deskripsi	Prioritas
+Tab Harian/Mingguan/Bulanan	Filter periode data	Tinggi
+Grafik batang per jam	Distribusi pembukaan berdasarkan jam	Tinggi
+Grafik lingkaran alasan	Distribusi alasan	Tinggi
+Kartu tren	Perbandingan dengan periode sebelumnya	Sedang
+Kartu pola menarik	Insight dari Gemini	Sedang
+Kartu mood vs kebiasaan	Korelasi mood (dari jurnal) dengan pola pembukaan	Sedang
+Daftar aplikasi + statistik	Per aplikasi: jumlah buka, durasi, alasan	Tinggi
+6.5 Aplikasi (Daftar Target)
+Fitur	Deskripsi	Prioritas
+Search bar	Cari aplikasi terpasang	Sedang
+Daftar aplikasi terpasang	Semua app di HP, dengan toggle on/off	Tinggi
+Pengaturan durasi per aplikasi	Tap untuk ubah durasi jeda	Tinggi
+Tombol tambah aplikasi	Buka daftar lengkap	Sedang
+Preset	"Media Sosial", "Game", "Video"	Rendah
+6.6 Jurnal
+Fitur	Deskripsi	Prioritas
+Tab "Tulisanku"	Daftar entri jurnal user	Tinggi
+Tab "Bacaan"	Berisi artikel-artikel edukasi	Tinggi
+Tulis entri baru	Editor teks sederhana	Tinggi
+Tag emosi	Pilih emosi untuk setiap entri	Tinggi
+Filter	Tanggal, tag emosi, jenis entri	Sedang
+Search	Cari kata kunci di entri	Sedang
+Grafik mood	Visualisasi mood dari waktu ke waktu	Sedang
+Kaitkan dengan gerbang	Entri bisa dikaitkan dengan kejadian gerbang	Sedang
+Prompt dari Gemini	Tombol "Minta pertanyaan"	Tinggi
+Ringkasan mingguan	Dari Gemini	Sedang
+Ekspor	PDF atau teks	Rendah
+6.7 Artikel (di dalam Jurnal, tab "Bacaan")
+Fitur	Deskripsi	Prioritas
+Daftar artikel	5–8 artikel pendek (500–800 kata)	Tinggi
+Baca offline	Artikel disimpan lokal	Tinggi
+Tandai sudah dibaca	Indikator visual	Rendah
+Search sederhana	Cari judul artikel	Rendah
+Tombol "Coba Praktikkan"	Di akhir artikel, mengarah ke pengaturan delay	Sedang
+6.8 Pengaturan
+Fitur	Deskripsi	Prioritas
+Durasi jeda default	Slider 3–30 detik	Tinggi
+Eskalasi friksi	Toggle on/off	Sedang
+Mode fokus	Tombol mulai sesi fokus	Sedang
+Jadwal blocking	Atur jam otomatis	Sedang
+Budget waktu harian	Batas waktu per aplikasi	Rendah
+Pengingat refleksi	Jam berapa notifikasi muncul	Rendah
+Ringkasan mingguan	Toggle on/off	Rendah
+Info privasi	"Data disimpan lokal"	Tinggi
+Ekspor data	Simpan ke file JSON/CSV	Sedang
+Hapus semua data	Reset total	Sedang
+Tentang	Versi, kredit, kebijakan privasi	Rendah
+6.9 Overlay Gerbang (Layar Khusus)
+Fitur	Deskripsi	Prioritas
+Ikon & nama aplikasi	Menampilkan app yang akan dibuka	Tinggi
+Pertanyaan dari Gemini	Dinamis, berdasarkan pola historis	Tinggi
+Pilihan alasan	Hiburan, Bosan, Cek Notifikasi, Refleks, Cari Informasi	Tinggi
+Countdown timer	Angka mundur sebelum tombol "Buka" aktif	Tinggi
+Tombol "Batalkan"	Selalu aktif	Tinggi
+Tombol "Buka"	Aktif setelah countdown selesai	Tinggi
+Tombol "Tulis refleksi"	Membuka editor jurnal dengan konteks gerbang	Sedang
+Fallback pertanyaan statis	Kalau Gemini gagal/timeout	Sedang
+6.10 Layar Pemulihan (Layar Khusus)
+Fitur	Deskripsi	Prioritas
+Ringkasan sesi	"Kamu buka TikTok 4 kali malam ini"	Sedang
+Pilihan emosi	Lelah, Cemas, Bosan, Kesepian, Stres, Lainnya	Sedang
+Respons Gemini	Empatik, tidak menghakimi	Sedang
+Tombol "Tulis di Jurnal"	Membuka editor jurnal dengan konteks pemulihan	Sedang
+Tombol lanjutkan	Tutup layar	Sedang
+7. Integrasi AI (Gemini)
+7.1 Di Mana AI Bekerja
+Screen	AI Bekerja?	Bentuk Kerja AI
+Overlay Gerbang	Ya	Personalisasi pertanyaan berdasarkan pola historis
+Layar Pemulihan	Ya	Respons empatik berdasarkan emosi yang dipilih
+Statistik	Ya	Insight pola tersembunyi + korelasi mood vs kebiasaan
+Beranda	Ya	Pertanyaan refleksi yang relevan dengan hari ini
+Jurnal	Ya	Prompt refleksi, ringkasan mingguan, analisis mood
+Artikel	Tidak	Konten statis, ditulis manual
+Onboarding	Tidak	Penjelasan + izin
+Pengaturan	Tidak	Konfigurasi teknis
+7.2 Batas Etis
+AI tidak boleh memberi diagnosis medis
+
+AI tidak boleh menyarankan tindakan klinis
+
+AI harus mendorong user mencari bantuan profesional jika pola mengkhawatirkan
+
+AI tidak boleh menghakimi atau memperkuat rasa bersalah
+
+Data yang dikirim ke AI harus minimal dan anonim
+
+7.3 Fallback
+Setiap fitur yang memakai AI harus punya fallback ke logika statis. Jika internet mati atau API gagal, aplikasi harus tetap berfungsi.
+
+8. Desain & Pengalaman Pengguna
+8.1 Prinsip Desain
+Tenang, bukan menakutkan. Aplikasi tidak boleh terasa seperti polisi atau orang tua yang marah.
+
+Jelas, bukan ramai. Layar harus bersih. Informasi penting harus langsung terlihat.
+
+Empatik, bukan menghakimi. Warna dan bahasa visual harus hangat.
+
+8.2 Color Palette
+Peran	Hex	Nama
+Primary	#6B8F71	Sage Green
+Primary (terang)	#7BAE8A	Mint Lembut
+Latar (light)	#F7F5F2	Putih Tulang
+Latar (dark)	#1A1C1E	Charcoal Gelap
+Teks utama	#2D2F31	Charcoal
+Teks sekunder	#6B7280	Abu Medium
+Aksen	#D9A441	Amber Lembut
+Netral	#8A9199	Abu Kebiruan
+Peringatan lembut	#C97B7B	Dusty Rose
+8.3 Tipografi
+Font: Roboto (default Android) atau Inter
+
+Ukuran pertanyaan di overlay: minimal 20sp
+
+Ukuran teks artikel: 16sp dengan line height 1.5
+
+Ukuran teks jurnal: 16sp dengan line height 1.6
+
+8.4 Navigasi
+Bottom navigation dengan 5 item:
+
+Beranda
+
+Statistik
+
+Aplikasi
+
+Jurnal (dengan tab "Tulisanku" dan "Bacaan")
+
+Pengaturan
+
+Layar khusus (di luar navigasi):
+
+Onboarding
+
+Overlay Gerbang
+
+Layar Pemulihan
+
+9. Keamanan & Privasi
+9.1 Prinsip Privasi
+Semua data disimpan lokal. Tidak ada server, tidak ada cloud sync.
+
+Data yang dikirim ke AI minimal. Hanya data agregat yang tidak mengidentifikasi user.
+
+User punya kendali penuh. Bisa ekspor dan hapus semua data kapan saja.
+
+Transparan. User tahu data apa yang dibaca dan mengapa.
+
+Jurnal bersifat privat. Isi jurnal tidak pernah dikirim ke AI tanpa izin user.
+
+9.2 Izin yang Diminta
+Semua izin diminta dengan penjelasan mengapa diperlukan. User bisa menolak, tapi fitur tertentu tidak akan berfungsi.
+
+10. Rencana Pengembangan
+10.1 Fase 1: Fondasi (Minggu 1–2)
+Setup proyek Kotlin + Jetpack Compose
+
+Onboarding + izin
+
+Deteksi aplikasi foreground via UsageStats
+
+Room database
+
+Overlay dasar dengan pertanyaan statis
+
+10.2 Fase 2: Fitur Inti (Minggu 3–4)
+Pencatatan alasan dan pola
+
+Beranda dengan ringkasan
+
+Statistik dasar (grafik batang + lingkaran)
+
+Pengaturan durasi dan toggle aplikasi
+
+Jurnal dasar (tulis, lihat, tag emosi)
+
+10.3 Fase 3: AI & Konten (Minggu 5–6)
+Integrasi Gemini API untuk overlay
+
+Integrasi Gemini untuk statistik
+
+Integrasi Gemini untuk prompt jurnal
+
+Layar Pemulihan
+
+5–8 artikel pendek
+
+Ringkasan mingguan
+
+10.4 Fase 4: Polishing (Minggu 7–8)
+Dark mode
+
+Animasi dan transisi
+
+Grafik mood
+
+Testing di berbagai perangkat
+
+Perbaikan bug
+
+Persiapan demo Pilmapres
+
+11. Risiko & Mitigasi
+Risiko	Dampak	Mitigasi
+UsageStats delay	Overlay muncul terlambat	Gunakan polling interval pendek; pertimbangkan AccessibilityService sebagai alternatif
+Overlay tidak muncul di beberapa perangkat	Fitur inti tidak bekerja	Testing di berbagai merek; fallback ke notifikasi
+Gemini API timeout	Overlay kosong	Fallback ke pertanyaan statis
+User merasa terganggu	Aplikasi di-uninstall	Desain yang tenang; user bisa atur durasi; tidak memblokir
+Data bocor	Kepercayaan hilang	Semua data lokal; tidak ada server
+Baterai terkuras	User tidak nyaman	Optimasi foreground service; polling interval efisien
+Jurnal terlalu berat	User malas menulis	Prompt dari Gemini yang ringan; entri bisa sangat pendek
+12. Definisi Selesai (Definition of Done)
+Aplikasi dianggap selesai untuk versi Pilmapres jika:
+
+Onboarding berjalan lancar dan semua izin bisa diminta
+
+Deteksi aplikasi foreground bekerja di minimal 3 merek HP
+
+Overlay muncul dengan pertanyaan (statis atau AI)
+
+Data tercatat di database lokal
+
+Beranda dan Statistik menampilkan data dengan benar
+
+Jurnal berfungsi: tulis, lihat, tag emosi, filter
+
+Minimal 3 artikel bisa dibaca offline di tab "Bacaan"
+
+Gemini API terintegrasi untuk minimal 3 fitur
+
+Dark mode berfungsi
+
+Tidak ada crash selama demo 10 menit
+
+APK bisa di-install dan dijalankan di perangkat demo
+
+13. Lampiran
+13.1 Referensi Ilmiah
+Riset UCL tentang dua sistem pembelajaran dopamin (RPE dan APE)
+
+Prinsip acceptance and commitment untuk layar pemulihan
+
+Prinsip self-monitoring dan behavioral feedback untuk intervensi digital
+
+Prinsip expressive writing (Pennebaker) untuk jurnal wellness
+
+13.2 Topik Artikel
+Apa itu Dopamin
+
+Dopamin dan Kebiasaan Otomatis
+
+Mengapa Kamu Scroll Tanpa Sadar
+
+Apa itu Action Prediction Error
+
+Mengapa Memblokir Tidak Cukup
+
+Cara Kerja Seremind
+
+Jurnal dan Kesadaran Diri
+
+Emosi di Balik Kebiasaan
+
+13.3 Kontak
+[Nama Kamu]
+[NIM]
+[Program Studi Teknik Informatika]
+[UNIDA Gontor]
+
+14. Struktur File Kotlin
+text
+app/
+├── src/main/java/com/seremind/app/
+│   ├── SeremindApplication.kt
+│   ├── MainActivity.kt
+│   │
+│   ├── data/
+│   │   ├── local/
+│   │   │   ├── SeremindDatabase.kt
+│   │   │   ├── entity/
+│   │   │   │   ├── AppTarget.kt
+│   │   │   │   ├── GateEvent.kt
+│   │   │   │   ├── RecoveryEvent.kt
+│   │   │   │   ├── JournalEntry.kt
+│   │   │   │   ├── Article.kt
+│   │   │   │   └── UserPreference.kt
+│   │   │   ├── dao/
+│   │   │   │   ├── AppTargetDao.kt
+│   │   │   │   ├── GateEventDao.kt
+│   │   │   │   ├── RecoveryEventDao.kt
+│   │   │   │   ├── JournalEntryDao.kt
+│   │   │   │   ├── ArticleDao.kt
+│   │   │   │   └── UserPreferenceDao.kt
+│   │   │   └── repository/
+│   │   │       ├── AppTargetRepository.kt
+│   │   │       ├── GateEventRepository.kt
+│   │   │       ├── JournalRepository.kt
+│   │   │       └── ArticleRepository.kt
+│   │   │
+│   │   └── remote/
+│   │       ├── GeminiApiService.kt
+│   │       ├── GeminiRequest.kt
+│   │       └── GeminiResponse.kt
+│   │
+│   ├── service/
+│   │   ├── AppDetectionService.kt
+│   │   └── OverlayService.kt
+│   │
+│   ├── ui/
+│   │   ├── theme/
+│   │   │   ├── Color.kt
+│   │   │   ├── Theme.kt
+│   │   │   └── Type.kt
+│   │   │
+│   │   ├── navigation/
+│   │   │   └── SeremindNavGraph.kt
+│   │   │
+│   │   ├── onboarding/
+│   │   │   ├── OnboardingScreen.kt
+│   │   │   └── OnboardingViewModel.kt
+│   │   │
+│   │   ├── home/
+│   │   │   ├── HomeScreen.kt
+│   │   │   └── HomeViewModel.kt
+│   │   │
+│   │   ├── statistics/
+│   │   │   ├── StatisticsScreen.kt
+│   │   │   └── StatisticsViewModel.kt
+│   │   │
+│   │   ├── apps/
+│   │   │   ├── AppsScreen.kt
+│   │   │   └── AppsViewModel.kt
+│   │   │
+│   │   ├── journal/
+│   │   │   ├── JournalScreen.kt
+│   │   │   ├── JournalDetailScreen.kt
+│   │   │   ├── JournalEditorScreen.kt
+│   │   │   ├── JournalViewModel.kt
+│   │   │   ├── ArticlesTab.kt
+│   │   │   └── ArticleDetailScreen.kt
+│   │   │
+│   │   ├── settings/
+│   │   │   ├── SettingsScreen.kt
+│   │   │   └── SettingsViewModel.kt
+│   │   │
+│   │   ├── overlay/
+│   │   │   ├── GateOverlay.kt
+│   │   │   └── GateOverlayViewModel.kt
+│   │   │
+│   │   └── recovery/
+│   │       ├── RecoveryScreen.kt
+│   │       └── RecoveryViewModel.kt
+│   │
+│   └── util/
+│       ├── UsageStatsHelper.kt
+│       ├── OverlayHelper.kt
+│       ├── PermissionHelper.kt
+│       └── TimeFormatter.kt
+│
+└── src/main/res/
+    ├── values/
+    │   ├── colors.xml
+    │   ├── strings.xml
+    │   └── themes.xml
+    ├── drawable/
+    │   └── ic_launcher_foreground.xml
+    └── xml/
+        └── overlay_layout.xml
