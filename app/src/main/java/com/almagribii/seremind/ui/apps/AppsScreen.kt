@@ -1,6 +1,8 @@
 package com.almagribii.seremind.ui.apps
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,10 +23,14 @@ import androidx.compose.ui.unit.sp
 import com.almagribii.seremind.data.local.entity.AppTarget
 import com.almagribii.seremind.ui.theme.LightMint
 import com.almagribii.seremind.util.AppIcon
+import com.almagribii.seremind.data.local.entity.GateEvent
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private val categoryOrder = listOf("Media Sosial", "Video", "Game", "Lainnya")
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AppsScreen(viewModel: AppsViewModel) {
     val uiState by viewModel.uiState.collectAsState()
@@ -82,12 +89,15 @@ fun AppsScreen(viewModel: AppsViewModel) {
                                 AppTargetRow(
                                     target = target,
                                     onToggle = { viewModel.toggleTargetActive(target, it) }
+                                    ,onClick = { viewModel.selectTarget(target) }
+                                    ,onLongClick = { viewModel.requestDelete(target) }
                                 )
                             }
                         }
                     }
                 }
             }
+            Spacer(Modifier.height(70.dp))
         }
 
         FloatingActionButton(
@@ -98,7 +108,9 @@ fun AppsScreen(viewModel: AppsViewModel) {
             shape = CircleShape
         ) {
             Icon(Icons.Default.Add, contentDescription = "Tambah aplikasi", modifier = Modifier.size(28.dp))
+
         }
+
     }
 
     if (showAppPicker) {
@@ -112,6 +124,27 @@ fun AppsScreen(viewModel: AppsViewModel) {
                 viewModel.addTarget(packageName, appName)
                 showAppPicker = false
             }
+        )
+    }
+
+    uiState.selectedTarget?.let { target ->
+        AppInteractionDialog(
+            target = target,
+            events = uiState.selectedEvents,
+            onDismiss = viewModel::closeTargetDetails
+        )
+    }
+    if (uiState.showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissDelete,
+            title = { Text("Hapus ${uiState.selectedTarget?.appName}?") },
+            text = { Text("Aplikasi ini akan dihapus dari daftar target Seremind.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    uiState.selectedTarget?.let(viewModel::deleteTarget)
+                }) { Text("Hapus", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = viewModel::dismissDelete) { Text("Batal") } }
         )
     }
 }
@@ -132,10 +165,19 @@ private fun AppsHeader() {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AppTargetRow(target: AppTarget, onToggle: (Boolean) -> Unit) {
+private fun AppTargetRow(
+    target: AppTarget,
+    onToggle: (Boolean) -> Unit,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().combinedClickable(
+            onClick = onClick,
+            onLongClick = onLongClick
+        ),
         shape = RoundedCornerShape(14.dp),
         color = LightMint.copy(alpha = .22f)
     ) {
@@ -156,6 +198,7 @@ private fun AppTargetRow(target: AppTarget, onToggle: (Boolean) -> Unit) {
                     fontSize = 12.sp
                 )
             }
+
             Switch(
                 checked = target.isActive,
                 onCheckedChange = onToggle,
@@ -168,6 +211,46 @@ private fun AppTargetRow(target: AppTarget, onToggle: (Boolean) -> Unit) {
             )
         }
     }
+
+}
+
+@Composable
+private fun AppInteractionDialog(
+    target: AppTarget,
+    events: List<GateEvent>,
+    onDismiss: () -> Unit
+) {
+    val format = remember { SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AppIcon(target.packageName, target.appName, Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)))
+                Text(target.appName, Modifier.weight(1f).padding(start = 12.dp), fontWeight = FontWeight.Bold)
+                IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Tutup") }
+            }
+        },
+        text = {
+            if (events.isEmpty()) {
+                Text("Belum ada interaksi tercatat untuk aplikasi ini.")
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Riwayat interaksi", fontWeight = FontWeight.Bold)
+                    events.take(20).forEach { event ->
+                        Column {
+                            Text(format.format(Date(event.timestamp)), fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "${if (event.action == "cancelled") "Dicegah" else "Dibuka"} - ${event.reason}",
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Tutup") } }
+    )
 }
 
 @Composable

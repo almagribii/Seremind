@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.almagribii.seremind.data.local.SeremindDatabase
 import com.almagribii.seremind.data.local.entity.AppTarget
+import com.almagribii.seremind.data.local.entity.GateEvent
 import com.almagribii.seremind.util.InstalledAppHelper
 import com.almagribii.seremind.util.InstalledAppInfo
 import kotlinx.coroutines.Dispatchers
@@ -17,11 +18,15 @@ data class AppsUiState(
     val targets: List<AppTarget> = emptyList(),
     val installedApps: List<InstalledAppInfo> = emptyList(),
     val isLoading: Boolean = false
+    ,val selectedTarget: AppTarget? = null
+    ,val selectedEvents: List<GateEvent> = emptyList()
+    ,val showDeleteConfirmation: Boolean = false
 )
 
 class AppsViewModel(application: Application) : AndroidViewModel(application) {
     private val db = SeremindDatabase.getDatabase(application)
     private val appTargetDao = db.appTargetDao()
+    private val gateEventDao = db.gateEventDao()
 
     private val _uiState = MutableStateFlow(AppsUiState())
     val uiState: StateFlow<AppsUiState> = _uiState.asStateFlow()
@@ -70,6 +75,37 @@ class AppsViewModel(application: Application) : AndroidViewModel(application) {
                 appTargetDao.insert(newTarget)
                 loadTargets()
             }
+        }
+    }
+
+    fun selectTarget(target: AppTarget) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val events = gateEventDao.getEventsForPackage(target.packageName)
+            _uiState.value = _uiState.value.copy(selectedTarget = target, selectedEvents = events)
+        }
+    }
+
+    fun closeTargetDetails() {
+        _uiState.value = _uiState.value.copy(selectedTarget = null, selectedEvents = emptyList())
+    }
+
+    fun requestDelete(target: AppTarget) {
+        _uiState.value = _uiState.value.copy(selectedTarget = target, showDeleteConfirmation = true)
+    }
+
+    fun dismissDelete() {
+        _uiState.value = _uiState.value.copy(showDeleteConfirmation = false)
+    }
+
+    fun deleteTarget(target: AppTarget) {
+        viewModelScope.launch(Dispatchers.IO) {
+            appTargetDao.delete(target)
+            _uiState.value = _uiState.value.copy(
+                targets = _uiState.value.targets.filterNot { it.id == target.id },
+                selectedTarget = null,
+                selectedEvents = emptyList(),
+                showDeleteConfirmation = false
+            )
         }
     }
 }

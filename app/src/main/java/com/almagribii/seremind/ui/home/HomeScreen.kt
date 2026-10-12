@@ -7,9 +7,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -85,7 +88,7 @@ fun HomeScreen(
                 )
             ) {
                 Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.onPrimary)
+                    Icon(Icons.Default.SelfImprovement, null, tint = MaterialTheme.colorScheme.onPrimary)
                     Text("Refleksi Hari Ini", style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
                     Text(state.aiPrompt, style = MaterialTheme.typography.bodyLarge,
@@ -140,7 +143,7 @@ fun HomeScreen(
                 onUsage = viewModel::requestUsagePermission,
                 onOverlay = viewModel::requestOverlayPermission
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(70.dp))
         }
     }
 }
@@ -163,7 +166,7 @@ private fun Header(greeting: String, date: String) {
             Box(Modifier.size(58.dp).clip(CircleShape)
                 .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = .16f)),
                 contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.onPrimary,
+                Icon(Icons.Default.SelfImprovement, null, tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(30.dp))
             }
         }
@@ -203,10 +206,10 @@ private fun ShortcutRow(
     onJournal: () -> Unit, onStatistics: () -> Unit, onApps: () -> Unit, onArticles: () -> Unit
 ) {
     val items = listOf(
-        Triple(Icons.Default.Star, "Jurnal", onJournal),
-        Triple(Icons.Default.Star, "Statistik", onStatistics),
-        Triple(Icons.Default.List, "Aplikasi", onApps),
-        Triple(Icons.Default.Star, "Artikel", onArticles)
+        Triple(Icons.Default.EditNote, "Jurnal", onJournal),
+        Triple(Icons.Default.BarChart, "Statistik", onStatistics),
+        Triple(Icons.Default.GridView, "Aplikasi", onApps),
+        Triple(Icons.AutoMirrored.Filled.Article, "Artikel", onArticles)
     )
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         items.forEach { (icon, label, action) ->

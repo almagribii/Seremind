@@ -7,10 +7,13 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -46,22 +49,22 @@ import com.almagribii.seremind.ui.statistics.StatisticsViewModel
 
 sealed class Screen(val route: String, val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     object Home : Screen("home", "Beranda", Icons.Default.Home)
-    object Statistics : Screen("statistics", "Statistik", Icons.Default.Star)
-    object Apps : Screen("apps", "Aplikasi", Icons.Default.List)
-    object Journal : Screen("journal", "Jurnal", Icons.Default.Star)
+    object Statistics : Screen("statistics", "Statistik", Icons.Default.BarChart)
+    object Apps : Screen("apps", "Aplikasi", Icons.Default.GridView)
+    object Journal : Screen("journal", "Jurnal", Icons.Default.EditNote)
     object Settings : Screen("settings", "Pengaturan", Icons.Default.Settings)
     object Onboarding : Screen("onboarding", "Onboarding", Icons.Default.Home)
     object GateOverlay : Screen("gate_overlay/{packageName}/{appName}/{delaySeconds}", "Overlay", Icons.Default.Home) {
         fun createRoute(packageName: String, appName: String, delaySeconds: Int) = "gate_overlay/$packageName/$appName/$delaySeconds"
     }
     object Recovery : Screen("recovery", "Pemulihan", Icons.Default.Home)
-    object JournalEditor : Screen("journal_editor?prompt={prompt}", "Editor Jurnal", Icons.Default.Star) {
+    object JournalEditor : Screen("journal_editor?prompt={prompt}", "Editor Jurnal", Icons.Default.EditNote) {
         fun createRoute(prompt: String?) = if (prompt != null) "journal_editor?prompt=$prompt" else "journal_editor"
     }
-    object JournalDetail : Screen("journal_detail/{entryId}", "Detail Jurnal", Icons.Default.Star) {
+    object JournalDetail : Screen("journal_detail/{entryId}", "Detail Jurnal", Icons.Default.Description) {
         fun createRoute(entryId: Int) = "journal_detail/$entryId"
     }
-    object ArticleDetail : Screen("article_detail/{articleId}", "Detail Artikel", Icons.Default.Star) {
+    object ArticleDetail : Screen("article_detail/{articleId}", "Detail Artikel", Icons.Default.Article) {
         fun createRoute(articleId: Int) = "article_detail/$articleId"
     }
 }

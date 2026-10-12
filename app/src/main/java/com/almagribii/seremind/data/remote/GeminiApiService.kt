@@ -9,7 +9,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 
-class GeminiApiService(private val apiKey: String = "AIzaSyBjVE3F70wMTNWfS1skyUJCLhnbO7c14zU") {
+class GeminiApiService(private val apiKey: String = "") {
 
     private val client = OkHttpClient()
 

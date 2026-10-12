@@ -1,7 +1,10 @@
 package com.almagribii.seremind.ui.journal
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -23,21 +26,25 @@ fun JournalEditorScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp),
+            .padding(horizontal = 20.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Tulis Catatan Jurnal",
+            text = "Tulisanku",
             style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
         )
 
         if (initialPrompt != null) {
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(text = "Prompt: $initialPrompt", style = MaterialTheme.typography.bodyMedium)
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(text = "Prompt refleksi", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                    Text(text = initialPrompt, style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
@@ -48,20 +55,30 @@ fun JournalEditorScreen(
             placeholder = { Text("Tuliskan pikiran dan perasaanmu di sini...") },
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
+                .weight(1f),
+            shape = RoundedCornerShape(16.dp),
+            minLines = 8,
+            maxLines = 14,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                cursorColor = MaterialTheme.colorScheme.primary
+            )
         )
 
-        Text(text = "Bagaimana perasaanmu saat ini?", style = MaterialTheme.typography.titleLarge, fontSize = 16.sp)
+        Text(text = "Bagaimana perasaanmu saat ini?", style = MaterialTheme.typography.titleMedium,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            emotions.forEach { emotion ->
-                FilterChip(
-                    selected = selectedEmotion == emotion,
-                    onClick = { selectedEmotion = if (selectedEmotion == emotion) null else emotion },
-                    label = { Text(emotion) }
-                )
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                emotions.forEach { emotion ->
+                    FilterChip(
+                        selected = selectedEmotion == emotion,
+                        onClick = { selectedEmotion = if (selectedEmotion == emotion) null else emotion },
+                        label = { Text(emotion) }
+                    )
+                }
             }
         }
 
