@@ -27,4 +27,7 @@ interface AppTargetDao {
 
     @Query("SELECT * FROM app_targets")
     suspend fun getAllTargets(): List<AppTarget>
+
+    @Query("DELETE FROM app_targets WHERE package_name IN (:packageNames)")
+    suspend fun deleteByPackages(packageNames: List<String>)
 }

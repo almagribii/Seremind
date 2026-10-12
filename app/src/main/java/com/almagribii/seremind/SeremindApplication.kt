@@ -6,6 +6,10 @@ import android.os.Build
 import com.almagribii.seremind.data.local.SeremindDatabase
 import com.almagribii.seremind.service.AppDetectionService
 import com.almagribii.seremind.util.PermissionHelper
+import com.almagribii.seremind.ui.onboarding.RecommendedApps
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class SeremindApplication : Application() {
 
@@ -13,6 +17,7 @@ class SeremindApplication : Application() {
         super.onCreate()
         // Initialize Database instance
         SeremindDatabase.getDatabase(this)
+        migrateLegacyPresetTargets()
 
         // Start AppDetectionService if usage stats permission is granted
         if (PermissionHelper.hasUsageStatsPermission(this)) {
@@ -21,6 +26,22 @@ class SeremindApplication : Application() {
                 startForegroundService(serviceIntent)
             } else {
                 startService(serviceIntent)
+            }
+        }
+    }
+
+    private fun migrateLegacyPresetTargets() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val database = SeremindDatabase.getDatabase(applicationContext)
+            val preferences = database.userPreferenceDao()
+            if (preferences.getPreference("legacy_preset_targets_removed") != "true") {
+                database.appTargetDao().deleteByPackages(RecommendedApps.packageNames)
+                preferences.setPreference(
+                    com.almagribii.seremind.data.local.entity.UserPreference(
+                        "legacy_preset_targets_removed",
+                        "true"
+                        )
+                )
             }
         }
     }

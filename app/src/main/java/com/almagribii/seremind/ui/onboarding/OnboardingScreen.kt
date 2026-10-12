@@ -101,8 +101,7 @@ fun OnboardingScreen(
                         }
                     )
                     2 -> PresetAppsPage(
-                        presetApps = presetApps,
-                        onToggleApp = { packageName -> viewModel.toggleAppSelection(packageName) }
+                        presetApps = presetApps
                     )
                     3 -> DelaySliderPage(
                         delaySeconds = defaultDelay,
@@ -381,8 +380,7 @@ fun PermissionCardItem(
 
 @Composable
 fun PresetAppsPage(
-    presetApps: List<PresetAppItem>,
-    onToggleApp: (String) -> Unit
+    presetApps: List<PresetAppItem>
 ) {
     Column(
         modifier = Modifier
@@ -392,7 +390,7 @@ fun PresetAppsPage(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Pilih Aplikasi Target Awal",
+            text = "Rekomendasi Aplikasi",
             style = MaterialTheme.typography.titleLarge,
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
@@ -403,7 +401,7 @@ fun PresetAppsPage(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Pilih aplikasi yang ingin kamu berikan jeda reflektif secara otomatis.",
+            text = "Berikut aplikasi yang sering dipilih untuk jeda reflektif. Belum ada aplikasi yang ditargetkan; kamu bisa memilihnya nanti dari menu Aplikasi.",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
@@ -451,10 +449,11 @@ fun PresetAppsPage(
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
-                        Checkbox(
-                            checked = app.isSelected,
-                            onCheckedChange = { onToggleApp(app.packageName) },
-                            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
+                        Text(
+                            text = "Rekomendasi",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
