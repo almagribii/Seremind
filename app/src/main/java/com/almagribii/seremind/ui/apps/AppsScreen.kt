@@ -69,7 +69,7 @@ fun AppsScreen(viewModel: AppsViewModel) {
                 EmptyTargets()
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 28.dp),
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 20.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
@@ -79,7 +79,7 @@ fun AppsScreen(viewModel: AppsViewModel) {
                             item {
                                 Text(
                                     text = category,
-                                    style = MaterialTheme.typography.titleLarge,
+                                    style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onBackground,
                                     modifier = Modifier.padding(top = 2.dp, bottom = 2.dp)
@@ -97,20 +97,21 @@ fun AppsScreen(viewModel: AppsViewModel) {
                     }
                 }
             }
+
             Spacer(Modifier.height(70.dp))
         }
 
         FloatingActionButton(
             onClick = { showAppPicker = true },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 90.dp, end = 20.dp),
             containerColor = MaterialTheme.colorScheme.secondary,
             contentColor = MaterialTheme.colorScheme.onSecondary,
             shape = CircleShape
         ) {
             Icon(Icons.Default.Add, contentDescription = "Tambah aplikasi", modifier = Modifier.size(28.dp))
-
         }
-
     }
 
     if (showAppPicker) {

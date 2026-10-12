@@ -4,7 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -90,47 +93,54 @@ fun JournalEntriesTab(
 ) {
     val today = remember { Calendar.getInstance() }
     val dateFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
-    LazyColumn(
-        Modifier.fillMaxSize().padding(horizontal = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
-    ) {
-        item {
-            Card(Modifier.fillMaxWidth(), RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = .82f))) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(currentPrompt ?: "Apa satu hal yang kamu syukuri hari ini?",
-                            color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium)
-                    }
-                    TextButton(onClick = onAskPrompt) {
-                        Text("Jawab", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-        if (entries.isEmpty()) {
+
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(
+            Modifier.fillMaxSize().padding(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp)
+        ) {
             item {
-                Text("Belum ada catatan. Tulis refleksi pertamamu hari ini.",
-                    Modifier.fillMaxWidth().padding(vertical = 40.dp),
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = .6f))
-            }
-        } else {
-            item { Text("Hari Ini", fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground) }
-            items(entries, key = { it.id }) { entry ->
-                JournalEntryCard(entry, dateFormat, onEntryClick)
-            }
-        }
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                FloatingActionButton(onClick = onNewEntry, containerColor = MaterialTheme.colorScheme.secondary,
-                    contentColor = MaterialTheme.colorScheme.onSecondary) {
-                    Text("+", fontSize = 28.sp, fontWeight = FontWeight.Light)
+                Card(Modifier.fillMaxWidth(), RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = .82f))) {
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(currentPrompt ?: "Apa satu hal yang kamu syukuri hari ini?",
+                                color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium)
+                        }
+                        TextButton(onClick = onAskPrompt) {
+                            Text("Jawab", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
+            if (entries.isEmpty()) {
+                item {
+                    Text("Belum ada catatan. Tulis refleksi pertamamu hari ini.",
+                        Modifier.fillMaxWidth().padding(vertical = 40.dp),
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = .6f))
+                }
+            } else {
+                item { Text("Hari Ini", fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground) }
+                items(entries, key = { it.id }) { entry ->
+                    JournalEntryCard(entry, dateFormat, onEntryClick)
+                }
+            }
+        }
+
+        FloatingActionButton(
+            onClick = onNewEntry,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 90.dp, end = 20.dp),
+            containerColor = MaterialTheme.colorScheme.secondary,
+            contentColor = MaterialTheme.colorScheme.onSecondary,
+            shape = CircleShape
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "Tambah catatan", modifier = Modifier.size(28.dp))
         }
     }
 }
