@@ -134,14 +134,12 @@ fun HomeScreen(
                 }
             }
 
-            if (!state.hasUsagePermission || !state.hasOverlayPermission) {
-                PermissionNotice(
-                    hasUsage = state.hasUsagePermission,
-                    hasOverlay = state.hasOverlayPermission,
-                    onUsage = viewModel::requestUsagePermission,
-                    onOverlay = viewModel::requestOverlayPermission
-                )
-            }
+            PermissionNotice(
+                hasUsage = state.hasUsagePermission,
+                hasOverlay = state.hasOverlayPermission,
+                onUsage = viewModel::requestUsagePermission,
+                onOverlay = viewModel::requestOverlayPermission
+            )
             Spacer(Modifier.height(12.dp))
         }
     }
@@ -151,7 +149,8 @@ fun HomeScreen(
 private fun Header(greeting: String, date: String) {
     Surface(color = MaterialTheme.colorScheme.primary, tonalElevation = 0.dp) {
         Row(
-            Modifier.fillMaxWidth().padding(start = 24.dp, end = 20.dp, top = 28.dp, bottom = 24.dp),
+        Modifier.fillMaxWidth().statusBarsPadding()
+            .padding(start = 24.dp, end = 20.dp, top = 28.dp, bottom = 24.dp),
             horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
@@ -225,11 +224,62 @@ private fun ShortcutRow(
 @Composable
 private fun PermissionNotice(hasUsage: Boolean, hasOverlay: Boolean, onUsage: () -> Unit, onOverlay: () -> Unit) {
     Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Izin diperlukan agar Seremind dapat bekerja", fontWeight = FontWeight.Bold)
-            if (!hasUsage) TextButton(onClick = onUsage) { Text("Aktifkan Akses Penggunaan") }
-            if (!hasOverlay) TextButton(onClick = onOverlay) { Text("Aktifkan Overlay") }
+        colors = CardDefaults.cardColors(
+            containerColor = if (hasUsage && hasOverlay) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.errorContainer
+            }
+        )
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                text = if (hasUsage && hasOverlay) "Seremind aktif" else "Izin diperlukan",
+                fontWeight = FontWeight.Bold,
+                color = if (hasUsage && hasOverlay) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onErrorContainer
+                }
+            )
+            PermissionStatusRow(
+                label = "Akses Penggunaan",
+                isGranted = hasUsage,
+                onClick = onUsage
+            )
+            PermissionStatusRow(
+                label = "Tampil di Atas App",
+                isGranted = hasOverlay,
+                onClick = onOverlay
+            )
+        }
+    }
+}
+
+@Composable
+private fun PermissionStatusRow(
+    label: String,
+    isGranted: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (isGranted) "✓" else "!",
+                color = if (isGranted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                fontWeight = FontWeight.Bold
+            )
+            Text(label, style = MaterialTheme.typography.bodyMedium)
+        }
+        TextButton(onClick = onClick) {
+            Text(if (isGranted) "Kelola" else "Aktifkan")
         }
     }
 }

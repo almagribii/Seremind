@@ -27,4 +27,7 @@ interface GateEventDao {
 
     @Query("SELECT strftime('%H', timestamp / 1000, 'unixepoch', 'localtime') as hour, COUNT(*) as count FROM gate_events WHERE timestamp >= :startTime GROUP BY hour ORDER BY hour")
     suspend fun getHourlyDistribution(startTime: Long): List<HourCount>
+
+    @Query("DELETE FROM gate_events")
+    suspend fun deleteAll()
 }

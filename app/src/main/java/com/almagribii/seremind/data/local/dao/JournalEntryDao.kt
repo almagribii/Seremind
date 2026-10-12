@@ -34,4 +34,7 @@ interface JournalEntryDao {
 
     @Query("SELECT emotion_tag, COUNT(*) as count FROM journal_entries WHERE timestamp >= :startTime AND emotion_tag IS NOT NULL GROUP BY emotion_tag ORDER BY count DESC")
     suspend fun getEmotionDistribution(startTime: Long): List<EmotionCount>
+
+    @Query("DELETE FROM journal_entries")
+    suspend fun deleteAll()
 }

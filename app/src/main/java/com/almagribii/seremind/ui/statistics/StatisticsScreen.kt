@@ -1,5 +1,6 @@
 package com.almagribii.seremind.ui.statistics
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -7,273 +8,170 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun StatisticsScreen(viewModel: StatisticsViewModel) {
-    val uiState by viewModel.uiState.collectAsState()
+fun StatisticsScreen(viewModel: StatisticsViewModel, onBack: () -> Unit) {
+    val state by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
+    val colors = listOf(
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.secondary,
+        MaterialTheme.colorScheme.tertiary,
+        MaterialTheme.colorScheme.error
+    )
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(scrollState)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+            .verticalScroll(scrollState).padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(
-            text = "Statistik",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold,
-            fontSize = 24.sp
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Kembali") }
+            Text("Statistik", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        }
+        PeriodSelector(state.filterPeriod, viewModel::setFilterPeriod)
+        StatisticsCard("Pembukaan per Jam") {
+            HourChart(state.hourly)
+        }
+        StatisticsCard("Alasan Membuka") {
+            if (state.reasons.isEmpty()) {
+                EmptyChart("Belum ada alasan yang tercatat pada periode ini.")
+            } else {
+                ReasonChart(state.reasons, colors)
+            }
+        }
+        StatisticsCard("Tren") {
+            val trend = state.trendPercent
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    when {
+                        trend == null -> "Belum cukup data untuk membandingkan tren."
+                        trend < 0 -> "${-trend}% lebih sedikit dibanding periode sebelumnya."
+                        trend > 0 -> "$trend% lebih banyak dibanding periode sebelumnya."
+                        else -> "Jumlah pembukaan sama dengan periode sebelumnya."
+                    }
+                )
+            }
+        }
+        StatisticsCard("Pola Menarik") {
+            val peak = state.peakHour
+            val reason = state.reasons.firstOrNull()?.reason
+            Text(
+                when {
+                    peak == null -> "Belum ada pola yang dapat dianalisis pada periode ini."
+                    reason == null -> "Pembukaan paling sering terjadi sekitar pukul $peak:00."
+                    else -> "Pembukaan paling sering terjadi sekitar pukul $peak:00, dengan alasan terbanyak \"$reason\"."
+                },
+                lineHeight = 22.sp
+            )
+        }
+    }
+}
 
-        // Segmented filter tabs ("Harian" | "Mingguan" | "Bulanan" with sage green pill selection)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(50))
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            listOf("Harian", "Mingguan", "Bulanan").forEach { period ->
-                val isSelected = uiState.filterPeriod == period
-                val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent
-                val contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+@Composable
+private fun PeriodSelector(selected: String, onSelect: (String) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(50.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant).padding(3.dp)
+    ) {
+        listOf("Harian", "Mingguan", "Bulanan").forEach { period ->
+            val active = selected == period
+            TextButton(
+                onClick = { onSelect(period) },
+                modifier = Modifier.weight(1f).clip(RoundedCornerShape(50.dp))
+                    .background(if (active) MaterialTheme.colorScheme.primary else Color.Transparent),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = if (active) MaterialTheme.colorScheme.onPrimary
+                    else MaterialTheme.colorScheme.onSurface
+                )
+            ) { Text(period, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal) }
+        }
+    }
+}
 
+@Composable
+private fun StatisticsCard(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        Modifier.fillMaxWidth(),
+        RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            content()
+        }
+    }
+}
+
+@Composable
+private fun HourChart(hourly: List<com.almagribii.seremind.data.local.dao.HourCount>) {
+    val values = (0..23).map { hour ->
+        hourly.firstOrNull { it.hour.toIntOrNull() == hour }?.count ?: 0
+    }
+    val max = values.maxOrNull() ?: 0
+    if (max == 0) {
+        EmptyChart("Belum ada pembukaan yang tercatat pada periode ini.")
+        return
+    }
+    Row(Modifier.fillMaxWidth().height(140.dp), verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        values.forEachIndexed { index, value ->
+            Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Bottom) {
                 Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(50))
-                        .background(backgroundColor)
-                        .padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    TextButton(
-                        onClick = { viewModel.setFilterPeriod(period) },
-                        colors = ButtonDefaults.textButtonColors(contentColor = contentColor),
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Text(
-                            text = period,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            fontSize = 14.sp
-                        )
-                    }
-                }
-            }
-        }
-
-        // Tren Card ("20% lebih sedikit dibanding minggu lalu")
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
-                Column {
-                    Text(
-                        text = "Tren Positif",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "20% lebih sedikit dibanding minggu lalu. Kesadaranmu semakin baik!",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                    )
-                }
-            }
-        }
-
-        // Pembukaan per Jam Bar Chart Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "Pembukaan per Jam",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
+                    Modifier.fillMaxWidth().height((value.toFloat() / max * 105f).coerceAtLeast(3f).dp)
+                        .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
+                        .background(MaterialTheme.colorScheme.primary)
                 )
-
-                if (uiState.hourly.isEmpty()) {
-                    Text(
-                        text = "Belum ada data per jam tercatat.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                } else {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        uiState.hourly.take(6).forEach { hc ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Pukul ${hc.hour}:00",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                                )
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .width((hc.count * 12).coerceIn(10, 150).dp)
-                                            .height(10.dp)
-                                            .clip(RoundedCornerShape(50))
-                                            .background(MaterialTheme.colorScheme.primary)
-                                    )
-                                    Text(
-                                        text = "${hc.count}x",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Alasan Membuka Donut/Pie Chart Card with legend dots
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = "Alasan Membuka",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                if (uiState.reasons.isEmpty()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        ReasonLegendItem(color = MaterialTheme.colorScheme.primary, reason = "Bosan", percentage = "45%")
-                        ReasonLegendItem(color = MaterialTheme.colorScheme.secondary, reason = "Hiburan", percentage = "30%")
-                        ReasonLegendItem(color = MaterialTheme.colorScheme.error, reason = "Cek Notifikasi", percentage = "25%")
-                    }
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        uiState.reasons.forEachIndexed { index, rc ->
-                            val color = when (index % 3) {
-                                0 -> MaterialTheme.colorScheme.primary
-                                1 -> MaterialTheme.colorScheme.secondary
-                                else -> MaterialTheme.colorScheme.error
-                            }
-                            ReasonLegendItem(color = color, reason = rc.reason, percentage = "${rc.count} kali")
-                        }
-                    }
-                }
-            }
-        }
-
-        // Pola Menarik Card with insight
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Pola Menarik",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Kamu cenderung membuka aplikasi media sosial paling sering pada malam hari saat merasa lelah atau bosan. Jeda reflektif terbukti membantu menurunkan pembukaan hingga 35%.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-                    lineHeight = 22.sp
-                )
+                if (index % 6 == 0) Text("$index", fontSize = 9.sp)
             }
         }
     }
 }
 
 @Composable
-fun ReasonLegendItem(color: androidx.compose.ui.graphics.Color, reason: String, percentage: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(12.dp)
-                    .clip(CircleShape)
-                    .background(color)
-            )
-            Text(
-                text = reason,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
-            )
+private fun ReasonChart(
+    reasons: List<com.almagribii.seremind.data.local.dao.ReasonCount>,
+    colors: List<Color>
+) {
+    val total = reasons.sumOf { it.count }.toFloat()
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Canvas(Modifier.size(120.dp)) {
+            var start = -90f
+            reasons.forEachIndexed { index, reason ->
+                val sweep = reason.count / total * 360f
+                drawArc(colors[index % colors.size], start, sweep, false,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 28.dp.toPx()))
+                start += sweep
+            }
         }
-        Text(
-            text = percentage,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Bold,
-            color = color
-        )
+        Spacer(Modifier.width(16.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            reasons.forEachIndexed { index, reason ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(colors[index % colors.size]))
+                    Spacer(Modifier.width(6.dp))
+                    Text("${reason.reason}: ${reason.count}", fontSize = 12.sp)
+                }
+            }
+        }
     }
+}
+
+@Composable
+private fun EmptyChart(message: String) {
+    Text(message, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .6f))
 }

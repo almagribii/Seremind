@@ -123,18 +123,7 @@ abstract class SeremindDatabase : RoomDatabase() {
                 articleDao.insert(article)
             }
 
-            // Prepopulate Default App Targets
-            val defaultTargets = listOf(
-                AppTarget(packageName = "com.zhiliaoapp.musically", appName = "TikTok", isActive = true, delaySeconds = 5),
-                AppTarget(packageName = "com.instagram.android", appName = "Instagram", isActive = true, delaySeconds = 5),
-                AppTarget(packageName = "com.google.android.youtube", appName = "YouTube", isActive = true, delaySeconds = 5),
-                AppTarget(packageName = "com.twitter.android", appName = "Twitter/X", isActive = true, delaySeconds = 5),
-                AppTarget(packageName = "com.facebook.katana", appName = "Facebook", isActive = true, delaySeconds = 5)
-            )
-
-            for (target in defaultTargets) {
-                appTargetDao.insert(target)
-            }
+            // Targets are always chosen explicitly by the user.
         }
     }
 }

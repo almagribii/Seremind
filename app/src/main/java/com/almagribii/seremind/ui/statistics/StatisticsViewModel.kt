@@ -19,6 +19,8 @@ data class StatisticsUiState(
     val cancelledCount: Int = 0,
     val reasons: List<ReasonCount> = emptyList(),
     val hourly: List<HourCount> = emptyList()
+    ,val trendPercent: Int? = null
+    ,val peakHour: String? = null
 )
 
 class StatisticsViewModel(application: Application) : AndroidViewModel(application) {
@@ -53,19 +55,29 @@ class StatisticsViewModel(application: Application) : AndroidViewModel(applicati
                     calendar.add(Calendar.MONTH, -1)
                 }
             }
+            val endTime = System.currentTimeMillis()
             val startTime = calendar.timeInMillis
+            val periodLength = endTime - startTime
+            val previousStart = startTime - periodLength
 
             val opened = gateDao.getOpenedCount(startTime)
             val cancelled = gateDao.getCancelledCount(startTime)
             val reasons = gateDao.getReasonDistribution(startTime)
             val hourly = gateDao.getHourlyDistribution(startTime)
+            val previousTotal = gateDao.getOpenedCount(previousStart) + gateDao.getCancelledCount(previousStart)
+            val currentTotal = opened + cancelled
+            val trend = if (previousTotal == 0) null
+            else ((currentTotal - previousTotal) * 100f / previousTotal).toInt()
+            val peak = hourly.maxByOrNull { it.count }?.hour
 
             _uiState.value = StatisticsUiState(
                 filterPeriod = period,
                 openedCount = opened,
                 cancelledCount = cancelled,
                 reasons = reasons,
-                hourly = hourly
+                hourly = hourly,
+                trendPercent = trend,
+                peakHour = peak
             )
         }
     }

@@ -14,12 +14,19 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class SettingsUiState(
     val defaultDelay: Int = 5,
     val isDarkTheme: Boolean = false,
     val hasUsagePermission: Boolean = false,
     val hasOverlayPermission: Boolean = false
+    ,val escalationFriction: Boolean = true
+    ,val focusMode: Boolean = false
+    ,val reflectionReminder: Boolean = true
+    ,val weeklySummary: Boolean = true
+    ,val blockingSchedule: String = "22.00 - 06.00"
+    ,val dailyBudget: String = "Belum diatur"
 )
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -37,9 +44,79 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch(Dispatchers.IO) {
             val delayStr = prefDao.getPreference("default_delay")
             val delay = delayStr?.toIntOrNull() ?: 5
-            _uiState.value = _uiState.value.copy(defaultDelay = delay)
+            _uiState.value = _uiState.value.copy(
+                defaultDelay = delay,
+                escalationFriction = prefDao.getPreference("escalation_friction") != "false",
+                focusMode = prefDao.getPreference("focus_mode") == "true",
+                reflectionReminder = prefDao.getPreference("reflection_reminder") != "false",
+                weeklySummary = prefDao.getPreference("weekly_summary") != "false",
+                blockingSchedule = prefDao.getPreference("blocking_schedule") ?: "22.00 - 06.00",
+                dailyBudget = prefDao.getPreference("daily_budget") ?: "Belum diatur"
+            )
         }
+
         checkPermissions()
+    }
+
+    fun setToggle(key: String, value: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            prefDao.setPreference(UserPreference(key, value.toString()))
+            _uiState.value = when (key) {
+                "escalation_friction" -> _uiState.value.copy(escalationFriction = value)
+                "focus_mode" -> _uiState.value.copy(focusMode = value)
+                "reflection_reminder" -> _uiState.value.copy(reflectionReminder = value)
+                "weekly_summary" -> _uiState.value.copy(weeklySummary = value)
+                else -> _uiState.value
+            }
+        }
+    }
+
+    fun setSchedule(value: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            prefDao.setPreference(UserPreference("blocking_schedule", value))
+            _uiState.value = _uiState.value.copy(blockingSchedule = value)
+        }
+    }
+
+    fun setBudget(value: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            prefDao.setPreference(UserPreference("daily_budget", value))
+            _uiState.value = _uiState.value.copy(dailyBudget = value)
+        }
+    }
+
+    fun deleteAllData(onComplete: () -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val database = SeremindDatabase.getDatabase(getApplication())
+            database.gateEventDao().deleteAll()
+            database.journalEntryDao().deleteAll()
+            database.recoveryEventDao().deleteAll()
+            database.appTargetDao().deleteAll()
+            withContext(Dispatchers.Main) { onComplete() }
+        }
+    }
+
+    fun exportData(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val database = SeremindDatabase.getDatabase(getApplication())
+            val events = database.gateEventDao().getEventsSince(0)
+            val journals = database.journalEntryDao().getAllEntries()
+            val text = buildString {
+                appendLine("Seremind - Ekspor Data")
+                appendLine("Gate events: ${events.size}")
+                events.forEach { appendLine("${it.timestamp},${it.packageName},${it.action},${it.reason}") }
+                appendLine("\nJournal entries: ${journals.size}")
+                journals.forEach { appendLine("${it.timestamp},${it.emotionTag},${it.content}") }
+            }
+            withContext(Dispatchers.Main) {
+                context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_SUBJECT, "Ekspor data Seremind")
+                    putExtra(Intent.EXTRA_TEXT, text)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }, "Ekspor data Seremind"))
+            }
+        }
     }
 
     fun checkPermissions() {

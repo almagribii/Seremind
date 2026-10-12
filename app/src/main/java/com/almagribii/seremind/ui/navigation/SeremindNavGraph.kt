@@ -1,7 +1,11 @@
 package com.almagribii.seremind.ui.navigation
 
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
@@ -10,6 +14,14 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -62,7 +74,6 @@ fun SeremindNavGraph(startDestination: String = Screen.Home.route) {
 
     val bottomNavScreens = listOf(
         Screen.Home,
-        Screen.Statistics,
         Screen.Apps,
         Screen.Journal,
         Screen.Settings
@@ -72,34 +83,15 @@ fun SeremindNavGraph(startDestination: String = Screen.Home.route) {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        bottomBar = {
-            if (showBottomBar) {
-                NavigationBar {
-                    bottomNavScreens.forEach { screen ->
-                        NavigationBarItem(
-                            icon = { Icon(screen.icon, contentDescription = screen.title) },
-                            label = { Text(screen.title) },
-                            selected = currentRoute == screen.route,
-                            onClick = {
-                                if (currentRoute != screen.route) {
-                                    navController.navigate(screen.route) {
-                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                }
-                            }
-                        )
-                    }
-                }
-            }
-        }
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        bottomBar = {}
     ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = startDestination,
-            modifier = Modifier.padding(innerPadding)
-        ) {
+        Box(Modifier.fillMaxSize().padding(innerPadding)) {
+            NavHost(
+                navController = navController,
+                startDestination = startDestination,
+                modifier = Modifier.fillMaxSize()
+            ) {
             composable(Screen.Home.route) {
                 val vm: HomeViewModel = viewModel()
                 HomeScreen(
@@ -113,11 +105,18 @@ fun SeremindNavGraph(startDestination: String = Screen.Home.route) {
             }
             composable(Screen.Statistics.route) {
                 val vm: StatisticsViewModel = viewModel()
-                StatisticsScreen(viewModel = vm)
+                StatisticsScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable(Screen.Apps.route) {
                 val vm: AppsViewModel = viewModel()
                 AppsScreen(viewModel = vm)
+            }
+            composable(Screen.Settings.route) {
+                val vm: SettingsViewModel = viewModel()
+                SettingsScreen(viewModel = vm)
             }
             composable(Screen.Journal.route) {
                 val vm: JournalViewModel = viewModel()
@@ -127,10 +126,6 @@ fun SeremindNavGraph(startDestination: String = Screen.Home.route) {
                     onNavigateToDetail = { id -> navController.navigate(Screen.JournalDetail.createRoute(id)) },
                     onNavigateToArticle = { id -> navController.navigate(Screen.ArticleDetail.createRoute(id)) }
                 )
-            }
-            composable(Screen.Settings.route) {
-                val vm: SettingsViewModel = viewModel()
-                SettingsScreen(viewModel = vm)
             }
             composable(Screen.Onboarding.route) {
                 val vm: OnboardingViewModel = viewModel()
@@ -160,9 +155,7 @@ fun SeremindNavGraph(startDestination: String = Screen.Home.route) {
                     appName = appName,
                     delaySeconds = delaySeconds,
                     onCancel = { navController.popBackStack() },
-                    onOpenAllowed = {
-                        navController.popBackStack()
-                    },
+                    onOpenAllowed = { navController.popBackStack() },
                     onWriteReflection = { prompt ->
                         navController.navigate(Screen.JournalEditor.createRoute(prompt))
                     }
@@ -217,6 +210,164 @@ fun SeremindNavGraph(startDestination: String = Screen.Home.route) {
                     articleId = articleId,
                     onBack = { navController.popBackStack() }
                 )
+            }
+        }
+        if (showBottomBar) {
+            SeremindBottomBar(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                screens = bottomNavScreens,
+                currentRoute = currentRoute,
+                onNavigate = { screen ->
+                    if (currentRoute != screen.route) {
+                        navController.navigate(screen.route) {
+                            popUpTo(navController.graph.startDestinationId) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                }
+            )
+        }
+    }
+}
+}
+
+@Composable
+private fun SeremindBottomBar(
+    modifier: Modifier = Modifier,
+    screens: List<Screen>,
+    currentRoute: String?,
+    onNavigate: (Screen) -> Unit
+) {
+    val selectedIndex = screens.indexOfFirst { it.route == currentRoute }
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(105.dp)
+            .navigationBarsPadding()
+    ) {
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val widthPx = with(density) { maxWidth.toPx() }
+        val itemWidth = widthPx / screens.size
+        val targetCenter = if (selectedIndex >= 0) {
+            itemWidth * selectedIndex + itemWidth / 2f
+        } else {
+            widthPx / 2f
+        }
+        val notchCenter by androidx.compose.animation.core.animateFloatAsState(
+            targetValue = targetCenter,
+            animationSpec = androidx.compose.animation.core.spring(
+                dampingRatio = 0.8f,
+                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+            ),
+            label = "bottomBarNotch"
+        )
+        val notchWidth = with(density) { 92.dp.toPx() }
+        val notchDepth = with(density) { 32.dp.toPx() }
+        val barTop = with(density) { 32.dp.toPx() }
+        val corner = with(density) { 12.dp.toPx() }
+        val barColor = MaterialTheme.colorScheme.surface
+
+        Canvas(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    shadowElevation = 10.dp.toPx()
+                    clip = false
+                    shape = GenericShape { size, _ ->
+                        moveTo(0f, barTop)
+                        lineTo(notchCenter - notchWidth / 2f, barTop)
+                        cubicTo(
+                            notchCenter - notchWidth * .35f, barTop,
+                            notchCenter - notchWidth * .30f, barTop + notchDepth,
+                            notchCenter, barTop + notchDepth
+                        )
+                        cubicTo(
+                            notchCenter + notchWidth * .30f, barTop + notchDepth,
+                            notchCenter + notchWidth * .35f, barTop,
+                            notchCenter + notchWidth / 2f, barTop
+                        )
+                        lineTo(size.width, barTop)
+                        lineTo(size.width, size.height)
+                        lineTo(0f, size.height)
+                        close()
+                    }
+                }
+        ) {
+            val path = Path().apply {
+                moveTo(0f, barTop)
+                lineTo(notchCenter - notchWidth / 2f, barTop)
+                cubicTo(
+                    notchCenter - notchWidth * .35f, barTop,
+                    notchCenter - notchWidth * .30f, barTop + notchDepth,
+                    notchCenter, barTop + notchDepth
+                )
+                cubicTo(
+                    notchCenter + notchWidth * .30f, barTop + notchDepth,
+                    notchCenter + notchWidth * .35f, barTop,
+                    notchCenter + notchWidth / 2f, barTop
+                )
+                lineTo(size.width, barTop)
+                lineTo(size.width, size.height - corner)
+                quadraticBezierTo(size.width, size.height, size.width - corner, size.height)
+                lineTo(corner, size.height)
+                quadraticBezierTo(0f, size.height, 0f, size.height - corner)
+                close()
+            }
+            drawPath(path, barColor)
+        }
+
+        Row(
+            Modifier.fillMaxWidth().align(Alignment.BottomCenter).height(65.dp),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            screens.forEachIndexed { index, screen ->
+                val selected = index == selectedIndex
+                val iconOffset by androidx.compose.animation.core.animateDpAsState(
+                    targetValue = if (selected) (-38).dp else (-10).dp,
+                    animationSpec = androidx.compose.animation.core.spring(
+                        dampingRatio = .75f,
+                        stiffness = 280f
+                    ),
+                    label = "bottomBarIcon"
+                )
+                val itemColor by androidx.compose.animation.animateColorAsState(
+                    targetValue = if (selected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurface.copy(alpha = .42f),
+                    label = "bottomBarLabel"
+                )
+                Box(
+                    Modifier.weight(1f).fillMaxHeight().clickable(
+                        interactionSource = MutableInteractionSource(),
+                        indication = null
+                    ) { onNavigate(screen) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (selected) {
+                        Surface(
+                            Modifier.offset(y = iconOffset).size(54.dp).shadow(8.dp, CircleShape),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(screen.icon, screen.title, tint = Color.White, modifier = Modifier.size(26.dp))
+                            }
+                        }
+                    } else {
+                        Icon(
+                            screen.icon, screen.title, tint = itemColor,
+                            modifier = Modifier.offset(y = iconOffset).size(24.dp)
+                        )
+                    }
+                    Text(
+                        screen.title,
+                        color = itemColor,
+                        fontSize = 10.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp)
+                    )
+                }
             }
         }
     }

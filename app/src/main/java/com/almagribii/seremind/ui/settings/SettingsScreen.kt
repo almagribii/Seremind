@@ -3,380 +3,199 @@ package com.almagribii.seremind.ui.settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.findViewTreeLifecycleOwner
+import androidx.compose.ui.platform.LocalView
 
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel) {
-    val uiState by viewModel.uiState.collectAsState()
-    val scrollState = rememberScrollState()
+    val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val view = LocalView.current
+    var dialog by remember { mutableStateOf<String?>(null) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var deleted by remember { mutableStateOf(false) }
 
     DisposableEffect(view) {
-        val lifecycleOwner = view.findViewTreeLifecycleOwner()
+        val owner = view.findViewTreeLifecycleOwner()
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.checkPermissions()
-            }
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.checkPermissions()
         }
-        lifecycleOwner?.lifecycle?.addObserver(observer)
-        onDispose {
-            lifecycleOwner?.lifecycle?.removeObserver(observer)
-        }
+        owner?.lifecycle?.addObserver(observer)
+        onDispose { owner?.lifecycle?.removeObserver(observer) }
     }
-
-    var escalationFriction by remember { mutableStateOf(true) }
-    var reflectionReminder by remember { mutableStateOf(true) }
-    var weeklySummary by remember { mutableStateOf(true) }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(scrollState)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+            .verticalScroll(rememberScrollState())
     ) {
-        Text(
-            text = "Pengaturan",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold,
-            fontSize = 24.sp
+        SettingsHeader()
+        Column(Modifier.padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            ProfileCard()
+            SettingsGroup("Pengaturan Umum") {
+                SettingRow(Icons.Default.Info, "Durasi jeda default", "${state.defaultDelay} detik") { dialog = "delay" }
+                SettingRow(Icons.Default.Info, "Eskalasi friksi", if (state.escalationFriction) "Aktif" else "Nonaktif") {
+                    viewModel.setToggle("escalation_friction", !state.escalationFriction)
+                }
+                SettingSwitchRow(Icons.Default.Lock, "Mode fokus", state.focusMode) {
+                    viewModel.setToggle("focus_mode", it)
+                }
+            }
+            SettingsGroup("Jadwal") {
+                SettingRow(Icons.Default.Info, "Jadwal blocking", state.blockingSchedule) { dialog = "schedule" }
+                SettingRow(Icons.Default.Info, "Budget waktu harian", state.dailyBudget) { dialog = "budget" }
+            }
+            SettingsGroup("Notifikasi") {
+                SettingSwitchRow(Icons.Default.Notifications, "Pengingat refleksi", state.reflectionReminder) {
+                    viewModel.setToggle("reflection_reminder", it)
+                }
+                SettingSwitchRow(Icons.Default.Notifications, "Ringkasan mingguan", state.weeklySummary) {
+                    viewModel.setToggle("weekly_summary", it)
+                }
+            }
+            SettingsGroup("Privasi") {
+                SettingRow(Icons.Default.Lock, "Data disimpan lokal", "Data tidak pernah meninggalkan HP kamu") {}
+                SettingRow(Icons.Default.Share, "Ekspor data", "Bagikan salinan data lokal") { viewModel.exportData(context) }
+                SettingRow(Icons.Default.Delete, "Hapus semua data", "Tidak dapat dibatalkan", destructive = true) {
+                    showDeleteConfirm = true
+                }
+            }
+            SettingsGroup("Tentang") {
+                SettingRow(Icons.Default.Info, "Versi", "1.0.0") {}
+                SettingRow(Icons.Default.Lock, "Kebijakan privasi", "Data lokal dan privasi pengguna") {}
+            }
+            if (deleted) Text("Semua data lokal telah dihapus.", color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(20.dp))
+        }
+    }
+
+    if (dialog != null) {
+        val title = when (dialog) { "delay" -> "Durasi jeda default"; "schedule" -> "Jadwal blocking"; else -> "Budget waktu harian" }
+        val initial = when (dialog) {
+            "delay" -> state.defaultDelay.toString()
+            "schedule" -> state.blockingSchedule
+            else -> state.dailyBudget
+        }
+        EditSettingDialog(title, initial, dialog == "delay", onDismiss = { dialog = null }) { value ->
+            when (dialog) {
+                "delay" -> value.toIntOrNull()?.coerceIn(3, 30)?.let(viewModel::setDefaultDelay)
+                "schedule" -> viewModel.setSchedule(value)
+                "budget" -> viewModel.setBudget(value)
+            }
+            dialog = null
+        }
+    }
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Hapus semua data?") },
+            text = { Text("Gate, jurnal, aplikasi target, dan preferensi akan dihapus permanen.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteAllData { deleted = true }
+                    showDeleteConfirm = false
+                }) { Text("Hapus", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Batal") } }
         )
-
-        // Section 0: Diagnostik & Perizinan (New)
-        SettingsSectionHeader(title = "Diagnostik & Perizinan")
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = "Status Izin Sistem",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-
-                // Permission 1: Akses Penggunaan
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Akses Penggunaan",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = if (uiState.hasUsagePermission) "Status: Aktif (Granted)" else "Status: Belum Aktif (Required)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (uiState.hasUsagePermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                        )
-                    }
-                    Button(
-                        onClick = { viewModel.requestUsagePermission(context) },
-                        shape = RoundedCornerShape(50),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (uiState.hasUsagePermission) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primary,
-                            contentColor = if (uiState.hasUsagePermission) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimary
-                        )
-                    ) {
-                        Text(if (uiState.hasUsagePermission) "Kelola" else "Aktifkan")
-                    }
-                }
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-
-                // Permission 2: Tampil di Atas App (Overlay)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Tampil di Atas App (Overlay)",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = if (uiState.hasOverlayPermission) "Status: Aktif (Granted)" else "Status: Belum Aktif (Required)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (uiState.hasOverlayPermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                        )
-                    }
-                    Button(
-                        onClick = { viewModel.requestOverlayPermission(context) },
-                        shape = RoundedCornerShape(50),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (uiState.hasOverlayPermission) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primary,
-                            contentColor = if (uiState.hasOverlayPermission) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimary
-                        )
-                    ) {
-                        Text(if (uiState.hasOverlayPermission) "Kelola" else "Aktifkan")
-                    }
-                }
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-
-                // Prominent "Test Gate Overlay" Button
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Button(
-                        onClick = { viewModel.testOverlay(context) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(50),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                    ) {
-                        Text("Test Gate Overlay", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    }
-                    Text(
-                        text = "Uji coba overlay window manager seketika untuk memverifikasi tampilan tanpa menunggu deteksi UsageStats.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                }
-            }
-        }
-
-        // Section 1: Gerbang
-        SettingsSectionHeader(title = "Gerbang")
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Durasi Jeda Default",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "${uiState.defaultDelay} detik",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Slider(
-                        value = uiState.defaultDelay.toFloat(),
-                        onValueChange = { viewModel.setDefaultDelay(it.toInt()) },
-                        valueRange = 3f..30f,
-                        steps = 26,
-                        colors = SliderDefaults.colors(thumbColor = MaterialTheme.colorScheme.primary, activeTrackColor = MaterialTheme.colorScheme.primary)
-                    )
-                }
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Eskalasi Friksi",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Menambah waktu jeda jika dibuka berulang kali",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                    }
-                    Switch(
-                        checked = escalationFriction,
-                        onCheckedChange = { escalationFriction = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = { /* Focus mode action */ },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(50)
-                ) {
-                    Text("Aktifkan Fokus Mode")
-                }
-            }
-        }
-
-        // Section 2: Jadwal
-        SettingsSectionHeader(title = "Jadwal")
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                SettingsRowItem(title = "Jadwal Blocking", subtitle = "22.00 - 06.00 (Mode Malam)")
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-                SettingsRowItem(title = "Budget Waktu Harian", subtitle = "Maksimal 45 menit per aplikasi")
-            }
-        }
-
-        // Section 3: Notifikasi
-        SettingsSectionHeader(title = "Notifikasi")
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = "Pengingat Refleksi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Switch(
-                        checked = reflectionReminder,
-                        onCheckedChange = { reflectionReminder = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
-                    )
-                }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = "Ringkasan Mingguan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Switch(
-                        checked = weeklySummary,
-                        onCheckedChange = { weeklySummary = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
-                    )
-                }
-            }
-        }
-
-        // Section 4: Privasi
-        SettingsSectionHeader(title = "Privasi")
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "Data Disimpan Lokal",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Semua aktivitas, statistik, dan jurnal Anda disimpan secara lokal di perangkat ini. Tidak ada server eksternal.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                    lineHeight = 20.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    OutlinedButton(
-                        onClick = { /* Export */ },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(50)
-                    ) {
-                        Text("Ekspor Data")
-                    }
-                    OutlinedButton(
-                        onClick = { /* Delete */ },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(50),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                    ) {
-                        Text("Hapus Semua")
-                    }
-                }
-            }
-        }
-
-        // Section 5: Tentang
-        SettingsSectionHeader(title = "Tentang")
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                SettingsRowItem(title = "Versi Aplikasi", subtitle = "1.0.0 (Seremind)")
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-                SettingsRowItem(title = "Kebijakan Privasi", subtitle = "Ketentuan dan Layanan")
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
 @Composable
-fun SettingsSectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 8.dp)
-    )
+private fun SettingsHeader() {
+    Surface(color = MaterialTheme.colorScheme.primary) {
+        Column(Modifier.fillMaxWidth().padding(start = 28.dp, top = 24.dp, bottom = 38.dp)) {
+            Text("Pengaturan", color = MaterialTheme.colorScheme.onPrimary,
+                style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+            Text("Atur Seremind sesuai kebutuhanmu", color = MaterialTheme.colorScheme.onPrimary.copy(alpha = .82f))
+        }
+    }
 }
 
 @Composable
-fun SettingsRowItem(title: String, subtitle: String) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            fontSize = 15.sp
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-        )
+private fun ProfileCard() {
+    Card(Modifier.fillMaxWidth().offset(y = (-20).dp), RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(5.dp)) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(42.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                contentAlignment = Alignment.Center) {
+                Text("S", color = MaterialTheme.colorScheme.onPrimary, fontSize = 20.sp)
+            }
+            Column(Modifier.padding(start = 12.dp).weight(1f)) {
+                Text("Teman Seremind", fontWeight = FontWeight.Bold)
+                Text("Pengguna Aktif", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .6f))
+            }
+            Text("›", fontSize = 28.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .6f))
+        }
     }
+}
+
+@Composable
+private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Card(Modifier.fillMaxWidth(), RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(content = content)
+        }
+    }
+}
+
+@Composable
+private fun SettingRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    value: String,
+    destructive: Boolean = false,
+    onClick: () -> Unit
+) {
+    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 3.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+            Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                Text(title, color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+                if (destructive) Text(value, fontSize = 11.sp, color = MaterialTheme.colorScheme.error.copy(alpha = .7f))
+            }
+            Text(value.takeIf { !destructive } ?: "›", fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = .65f))
+        }
+    }
+}
+
+@Composable
+private fun SettingSwitchRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+        Text(title, Modifier.weight(1f).padding(start = 10.dp))
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+private fun EditSettingDialog(title: String, initial: String, numeric: Boolean, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var value by remember { mutableStateOf(initial) }
+    AlertDialog(onDismissRequest = onDismiss, title = { Text(title) },
+        text = { OutlinedTextField(value, { value = it }, label = { Text(if (numeric) "Detik (3-30)" else "Nilai") }, singleLine = true) },
+        confirmButton = { TextButton(onClick = { onSave(value) }) { Text("Simpan") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal") } })
 }

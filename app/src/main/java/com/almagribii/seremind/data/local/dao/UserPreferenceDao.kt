@@ -13,4 +13,7 @@ interface UserPreferenceDao {
 
     @Query("SELECT value FROM user_preferences WHERE `key` = :key LIMIT 1")
     suspend fun getPreference(key: String): String?
+
+    @Query("DELETE FROM user_preferences")
+    suspend fun deleteAll()
 }

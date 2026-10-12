@@ -14,10 +14,14 @@ import androidx.core.view.WindowCompat
 
 private val LightColorScheme = lightColorScheme(
     primary = SagePrimary,
+    onPrimary = Color.White,
+    primaryContainer = LightMint.copy(alpha = 0.28f),
+    onPrimaryContainer = CharcoalText,
     secondary = SoftAmber,
+    secondaryContainer = LightMint.copy(alpha = 0.22f),
+    onSecondaryContainer = CharcoalText,
     background = LightBackground,
     surface = LightSurface,
-    onPrimary = Color.White,
     onSecondary = Color.White,
     onBackground = CharcoalText,
     onSurface = CharcoalText,
@@ -34,7 +38,7 @@ fun SeremindTheme(
         SideEffect {
             findActivity(view.context)?.let { activity ->
                 val window = activity.window
-                window.statusBarColor = colorScheme.primary.toArgb()
+                window.statusBarColor = android.graphics.Color.TRANSPARENT
                 WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
             }
         }

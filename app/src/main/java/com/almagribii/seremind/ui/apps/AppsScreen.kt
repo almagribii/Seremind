@@ -18,7 +18,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.almagribii.seremind.data.local.entity.AppTarget
+import com.almagribii.seremind.ui.theme.LightMint
 import com.almagribii.seremind.util.AppIcon
+
+private val categoryOrder = listOf("Media Sosial", "Video", "Game", "Lainnya")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,277 +33,222 @@ fun AppsScreen(viewModel: AppsViewModel) {
 
     val filteredTargets = uiState.targets.filter {
         it.appName.contains(searchQuery, ignoreCase = true) ||
-                it.packageName.contains(searchQuery, ignoreCase = true)
+            it.packageName.contains(searchQuery, ignoreCase = true)
     }
+    val groupedTargets = filteredTargets.groupBy { appCategory(it) }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Header
-            Text(
-                text = "Aplikasi",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold,
-                fontSize = 24.sp
-            )
-
-            // Search Bar "Cari aplikasi..."
+        Column(Modifier.fillMaxSize()) {
+            AppsHeader()
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Cari aplikasi...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                shape = RoundedCornerShape(50),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp).offset(y = (-20).dp),
+                placeholder = { Text("Cari aplikasi...", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .55f)) },
+                leadingIcon = { Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.primary) },
+                shape = RoundedCornerShape(50.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = .18f)
                 ),
                 singleLine = true
             )
 
-            // Group section title
-            Text(
-                text = "Media Sosial & Hiburan",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                modifier = Modifier.padding(top = 4.dp)
-            )
-
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(filteredTargets) { target ->
-                    AppTargetCard(
-                        target = target,
-                        onToggle = { active -> viewModel.toggleTargetActive(target, active) },
-                        onDelayChange = { delay -> viewModel.updateDelay(target, delay) }
-                    )
-                }
-            }
-        }
-
-        // Floating `+` button in sage circle
-        FloatingActionButton(
-            onClick = { showAppPicker = true },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(24.dp),
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-            shape = CircleShape
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "Tambah Aplikasi")
-        }
-    }
-
-    if (showAppPicker) {
-        ModalBottomSheet(
-            onDismissRequest = { showAppPicker = false },
-            sheetState = rememberModalBottomSheetState()
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.85f)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = "Pilih Aplikasi Target",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                OutlinedTextField(
-                    value = pickerSearchQuery,
-                    onValueChange = { pickerSearchQuery = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Cari aplikasi terinstal...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    shape = RoundedCornerShape(50),
-                    singleLine = true
-                )
-
-                val filteredInstalled = uiState.installedApps.filter {
-                    it.appName.contains(pickerSearchQuery, ignoreCase = true) ||
-                            it.packageName.contains(pickerSearchQuery, ignoreCase = true)
-                }
-
+            if (filteredTargets.isEmpty()) {
+                EmptyTargets()
+            } else {
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 28.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
-                    items(filteredInstalled) { appInfo ->
-                        val isAlreadyAdded = uiState.targets.any { it.packageName == appInfo.packageName }
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isAlreadyAdded) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surface
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    AppIcon(
-                                        packageName = appInfo.packageName,
-                                        appName = appInfo.appName,
-                                        drawable = appInfo.icon,
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .clip(CircleShape)
-                                    )
-                                    Column {
-                                        Text(
-                                            text = appInfo.appName,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 15.sp
-                                        )
-                                        Text(
-                                            text = appInfo.packageName,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                                            fontSize = 12.sp
-                                        )
-                                    }
-                                }
-
-                                if (isAlreadyAdded) {
-                                    Text(
-                                        text = "Ditambahkan",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                } else {
-                                    Button(
-                                        onClick = {
-                                            viewModel.addTarget(appInfo.packageName, appInfo.appName)
-                                            showAppPicker = false
-                                        },
-                                        shape = RoundedCornerShape(50),
-                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                                    ) {
-                                        Text("Tambah", fontSize = 12.sp)
-                                    }
-                                }
+                    categoryOrder.forEach { category ->
+                        val targets = groupedTargets[category].orEmpty()
+                        if (targets.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = category,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.padding(top = 2.dp, bottom = 2.dp)
+                                )
+                            }
+                            items(targets, key = { it.id }) { target ->
+                                AppTargetRow(
+                                    target = target,
+                                    onToggle = { viewModel.toggleTargetActive(target, it) }
+                                )
                             }
                         }
                     }
                 }
             }
         }
+
+        FloatingActionButton(
+            onClick = { showAppPicker = true },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
+            containerColor = MaterialTheme.colorScheme.secondary,
+            contentColor = MaterialTheme.colorScheme.onSecondary,
+            shape = CircleShape
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "Tambah aplikasi", modifier = Modifier.size(28.dp))
+        }
+    }
+
+    if (showAppPicker) {
+        AppPickerSheet(
+            installedApps = uiState.installedApps,
+            targets = uiState.targets,
+            searchQuery = pickerSearchQuery,
+            onSearchChange = { pickerSearchQuery = it },
+            onDismiss = { showAppPicker = false },
+            onAdd = { packageName, appName ->
+                viewModel.addTarget(packageName, appName)
+                showAppPicker = false
+            }
+        )
     }
 }
 
 @Composable
-fun AppTargetCard(
-    target: AppTarget,
-    onToggle: (Boolean) -> Unit,
-    onDelayChange: (Int) -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
+private fun AppsHeader() {
+    Surface(color = MaterialTheme.colorScheme.primary, tonalElevation = 0.dp) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            Modifier.fillMaxWidth().statusBarsPadding()
+                .padding(start = 28.dp, top = 24.dp, bottom = 38.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    AppIcon(
-                        packageName = target.packageName,
-                        appName = target.appName,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                    )
-                    Column {
-                        Text(
-                            text = target.appName,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = if (target.isActive) "Jeda ${target.delaySeconds} detik" else "Nonaktif",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (target.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
-                    }
-                }
+            Text("Aplikasi", color = MaterialTheme.colorScheme.onPrimary,
+                style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+            Text("Kelola aplikasi yang dijeda", color = MaterialTheme.colorScheme.onPrimary.copy(alpha = .82f),
+                style = MaterialTheme.typography.bodyLarge)
+        }
+    }
+}
 
-                Switch(
-                    checked = target.isActive,
-                    onCheckedChange = onToggle,
-                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+@Composable
+private fun AppTargetRow(target: AppTarget, onToggle: (Boolean) -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = LightMint.copy(alpha = .22f)
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AppIcon(
+                packageName = target.packageName,
+                appName = target.appName,
+                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp))
+            )
+            Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                Text(target.appName, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(
+                    "Jeda: ${target.delaySeconds} detik",
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = .68f),
+                    fontSize = 12.sp
                 )
             }
+            Switch(
+                checked = target.isActive,
+                onCheckedChange = onToggle,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.surface,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                    uncheckedThumbColor = MaterialTheme.colorScheme.surfaceVariant,
+                    uncheckedTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = .45f)
+                )
+            )
+        }
+    }
+}
 
-            if (target.isActive) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Durasi Jeda:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                        fontSize = 13.sp
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf(3, 5, 10, 15).forEach { sec ->
-                            FilterChip(
-                                selected = target.delaySeconds == sec,
-                                onClick = { onDelayChange(sec) },
-                                label = { Text("${sec}s", fontSize = 12.sp) },
-                                shape = RoundedCornerShape(50)
+@Composable
+private fun EmptyTargets() {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 36.dp, vertical = 48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("Belum ada aplikasi target", style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Text("Tekan tombol + untuk memilih aplikasi yang ingin diberi jeda reflektif.",
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = .65f))
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AppPickerSheet(
+    installedApps: List<com.almagribii.seremind.util.InstalledAppInfo>,
+    targets: List<AppTarget>,
+    searchQuery: String,
+    onSearchChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onAdd: (String, String) -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.fillMaxWidth().fillMaxHeight(.85f).padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Pilih aplikasi target", style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Cari aplikasi terinstal...") },
+                leadingIcon = { Icon(Icons.Default.Search, null) },
+                shape = RoundedCornerShape(50.dp),
+                singleLine = true
+            )
+            val apps = installedApps.filter {
+                it.appName.contains(searchQuery, true) || it.packageName.contains(searchQuery, true)
+            }
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 24.dp)) {
+                items(apps, key = { it.packageName }) { app ->
+                    val added = targets.any { it.packageName == app.packageName }
+                    ListItem(
+                        leadingContent = {
+                            AppIcon(
+                                packageName = app.packageName,
+                                appName = app.appName,
+                                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)),
+                                drawable = app.icon
                             )
+                        },
+                        headlineContent = { Text(app.appName, fontWeight = FontWeight.Bold) },
+                        supportingContent = { Text(app.packageName, fontSize = 11.sp) },
+                        trailingContent = {
+                            if (added) Text("Ditambahkan", color = MaterialTheme.colorScheme.primary,
+                                fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            else TextButton(onClick = { onAdd(app.packageName, app.appName) }) { Text("Tambah") }
                         }
-                    }
+                    )
                 }
             }
         }
+    }
+}
+
+private fun appCategory(target: AppTarget): String {
+    val value = "${target.packageName} ${target.appName}".lowercase()
+    return when {
+        listOf("instagram", "tiktok", "twitter", "facebook", "whatsapp", "telegram").any(value::contains) ->
+            "Media Sosial"
+        listOf("youtube", "netflix", "vidio", "spotify", "twitch").any(value::contains) ->
+            "Video"
+        listOf("mobile legends", "pubg", "game", "genshin", "free fire", "minecraft").any(value::contains) ->
+            "Game"
+        else -> "Lainnya"
     }
 }
