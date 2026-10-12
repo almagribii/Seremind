@@ -4,13 +4,16 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.almagribii.seremind.data.local.SeremindDatabase
 import com.almagribii.seremind.ui.overlay.OverlayWindowManager
+import com.almagribii.seremind.util.PermissionHelper
 import com.almagribii.seremind.util.UsageStatsHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +32,20 @@ class AppDetectionService : Service() {
         const val CHANNEL_ID = "SeremindServiceChannel"
         const val NOTIFICATION_ID = 1001
         private const val TAG = "AppDetectionService"
+
+        fun startService(context: Context) {
+            if (!PermissionHelper.hasUsageStatsPermission(context)) return
+            try {
+                val serviceIntent = Intent(context, AppDetectionService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(serviceIntent)
+                } else {
+                    context.startService(serviceIntent)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Unable to start AppDetectionService: ${e.message}")
+            }
+        }
     }
 
     override fun onCreate() {
@@ -36,7 +53,15 @@ class AppDetectionService : Service() {
         Log.d(TAG, "AppDetectionService onCreate")
         createNotificationChannel()
         val notification = createNotification()
-        startForeground(NOTIFICATION_ID, notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
         startAppMonitoring()
     }
 

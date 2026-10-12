@@ -1,8 +1,6 @@
 package com.almagribii.seremind.ui.home
 
 import android.app.Application
-import android.content.Intent
-import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.almagribii.seremind.data.local.SeremindDatabase
@@ -50,16 +48,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val hasOverlay = PermissionHelper.hasOverlayPermission(context)
 
             if (hasUsage && hasOverlay) {
-                try {
-                    val serviceIntent = Intent(context, AppDetectionService::class.java)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        context.startForegroundService(serviceIntent)
-                    } else {
-                        context.startService(serviceIntent)
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                AppDetectionService.startService(context)
             }
 
             val calendar = Calendar.getInstance().apply {

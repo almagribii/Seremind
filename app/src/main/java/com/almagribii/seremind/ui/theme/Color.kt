@@ -3,7 +3,7 @@ package com.almagribii.seremind.ui.theme
 import androidx.compose.ui.graphics.Color
 
 val SagePrimary = Color(0xFF4D3718)
-val LightMint = Color(0xFF7BAE8A)
+val LightMint = Color(0xFFB2A28C)
 val LightBackground = Color(0xFFF7F5F2)
 val DarkBackground = Color(0xFF1A1C1E)
 val CharcoalText = Color(0xFF2D2F31)

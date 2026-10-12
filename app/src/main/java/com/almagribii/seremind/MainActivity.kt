@@ -1,7 +1,6 @@
 package com.almagribii.seremind
 
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -71,13 +70,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (PermissionHelper.hasUsageStatsPermission(this) && PermissionHelper.hasOverlayPermission(this)) {
-            val serviceIntent = Intent(this, AppDetectionService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent)
-            } else {
-                startService(serviceIntent)
-            }
+        if (PermissionHelper.hasOverlayPermission(this)) {
+            AppDetectionService.startService(this)
         }
     }
 }

@@ -1,14 +1,11 @@
 package com.almagribii.seremind.ui.onboarding
 
 import android.app.Application
-import android.content.Intent
-import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.almagribii.seremind.data.local.SeremindDatabase
 import com.almagribii.seremind.data.local.entity.UserPreference
 import com.almagribii.seremind.service.AppDetectionService
-import com.almagribii.seremind.util.PermissionHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -46,14 +43,7 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
             prefDao.setPreference(UserPreference("default_delay", _defaultDelay.value.toString()))
 
             val context = getApplication<Application>()
-            if (PermissionHelper.hasUsageStatsPermission(context)) {
-                val serviceIntent = Intent(context, AppDetectionService::class.java)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(serviceIntent)
-                } else {
-                    context.startService(serviceIntent)
-                }
-            }
+            AppDetectionService.startService(context)
 
             viewModelScope.launch(Dispatchers.Main) {
                 onFinished()
