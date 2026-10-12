@@ -106,7 +106,9 @@ fun SeremindNavGraph(startDestination: String = Screen.Home.route) {
                     viewModel = vm,
                     onNavigateToJournal = { prompt ->
                         navController.navigate(Screen.JournalEditor.createRoute(prompt))
-                    }
+                    },
+                    onNavigateToApps = { navController.navigate(Screen.Apps.route) },
+                    onNavigateToStatistics = { navController.navigate(Screen.Statistics.route) }
                 )
             }
             composable(Screen.Statistics.route) {

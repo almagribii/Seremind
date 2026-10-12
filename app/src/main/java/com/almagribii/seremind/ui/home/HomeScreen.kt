@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
@@ -16,406 +17,231 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import com.almagribii.seremind.util.AppIcon
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
-    onNavigateToJournal: (initialPrompt: String?) -> Unit
+    onNavigateToJournal: (String?) -> Unit,
+    onNavigateToApps: () -> Unit,
+    onNavigateToStatistics: () -> Unit
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val scrollState = rememberScrollState()
+    val state by viewModel.uiState.collectAsState()
     val view = LocalView.current
+    val scrollState = rememberScrollState()
 
-    LaunchedEffect(Unit) {
-        viewModel.loadHomeData()
+    LaunchedEffect(Unit) { viewModel.loadHomeData() }
+    DisposableEffect(view) {
+        val owner = view.findViewTreeLifecycleOwner()
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.loadHomeData()
+        }
+        owner?.lifecycle?.addObserver(observer)
+        onDispose { owner?.lifecycle?.removeObserver(observer) }
     }
 
-    DisposableEffect(view) {
-        val lifecycleOwner = view.findViewTreeLifecycleOwner()
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.loadHomeData()
-            }
-        }
-        lifecycleOwner?.lifecycle?.addObserver(observer)
-        onDispose {
-            lifecycleOwner?.lifecycle?.removeObserver(observer)
-        }
+    val total = state.openedCount + state.cancelledCount
+    val date = remember { SimpleDateFormat("EEEE, d MMMM yyyy", Locale("id", "ID")).format(Date()) }
+    val greeting = when {
+        java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) < 12 -> "Selamat pagi,"
+        java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) < 18 -> "Selamat siang,"
+        else -> "Selamat malam,"
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(scrollState)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+            .verticalScroll(scrollState),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        // Permission Status Card for both required permissions
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (uiState.hasUsagePermission && uiState.hasOverlayPermission) {
-                    MaterialTheme.colorScheme.surface
-                } else {
-                    MaterialTheme.colorScheme.errorContainer
-                }
-            )
+        Header(greeting, date)
+
+        Column(
+            modifier = Modifier.padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "Status Izin Sistem",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = if (uiState.hasUsagePermission && uiState.hasOverlayPermission) {
-                        MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.onErrorContainer
-                    }
+            SummaryCard(total, state.cancelledCount, state.openedCount)
+
+            ShortcutRow(
+                onJournal = { onNavigateToJournal(state.aiPrompt) },
+                onStatistics = onNavigateToStatistics,
+                onApps = onNavigateToApps,
+                onArticles = { onNavigateToJournal(null) }
+            )
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.78f)
                 )
-
-                // Permission 1: Akses Penggunaan
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Akses Penggunaan",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = if (uiState.hasUsagePermission && uiState.hasOverlayPermission) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onErrorContainer
-                        )
-                        Text(
-                            text = if (uiState.hasUsagePermission) "Aktif (Granted)" else "Belum Aktif (Required)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (uiState.hasUsagePermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                        )
-                    }
-                    Button(
-                        onClick = { viewModel.requestUsagePermission() },
+            ) {
+                Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.onPrimary)
+                    Text("Refleksi Hari Ini", style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+                    Text(state.aiPrompt, style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = .9f), lineHeight = 23.sp)
+                    OutlinedButton(
+                        onClick = { onNavigateToJournal(state.aiPrompt) },
                         shape = RoundedCornerShape(50),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (uiState.hasUsagePermission) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.error,
-                            contentColor = if (uiState.hasUsagePermission) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onError
-                        )
-                    ) {
-                        Text(if (uiState.hasUsagePermission) "Kelola" else "Aktifkan")
-                    }
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary),
+                        border = ButtonDefaults.outlinedButtonBorder
+                    ) { Text("Jawab", fontWeight = FontWeight.Bold) }
                 }
+            }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+            Text("Momen Paling Rawan", style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
 
-                // Permission 2: Tampil di Atas App (Overlay)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            ) {
+                Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Notifications, null, tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(30.dp))
+                    Spacer(Modifier.width(14.dp))
+                    Column {
+                        Text(if (state.peakHour == "-") "Belum ada data" else state.peakHour,
+                            style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(
-                            text = "Tampil di Atas App (Overlay)",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = if (uiState.hasUsagePermission && uiState.hasOverlayPermission) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onErrorContainer
+                            if (state.peakReason == "-") "Belum ada alasan tercatat"
+                            else "Alasan terbanyak: ${state.peakReason}",
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = .7f)
                         )
-                        Text(
-                            text = if (uiState.hasOverlayPermission) "Aktif (Granted)" else "Belum Aktif (Required)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (uiState.hasOverlayPermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                        )
-                    }
-                    Button(
-                        onClick = { viewModel.requestOverlayPermission() },
-                        shape = RoundedCornerShape(50),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (uiState.hasOverlayPermission) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.error,
-                            contentColor = if (uiState.hasOverlayPermission) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onError
-                        )
-                    ) {
-                        Text(if (uiState.hasOverlayPermission) "Kelola" else "Aktifkan")
                     }
                 }
             }
-        }
 
-        // Greeting Header
+            Text("Aplikasi Target Aktif", style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold)
+            if (state.activeTargets.isEmpty()) {
+                Text("Belum ada aplikasi target. Tambahkan dari menu Aplikasi.",
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = .6f))
+            } else {
+                state.activeTargets.take(3).forEach { target ->
+                    AppRankItem(target.packageName, target.appName, "${target.delaySeconds}s")
+                }
+            }
+
+            if (!state.hasUsagePermission || !state.hasOverlayPermission) {
+                PermissionNotice(
+                    hasUsage = state.hasUsagePermission,
+                    hasOverlay = state.hasOverlayPermission,
+                    onUsage = viewModel::requestUsagePermission,
+                    onOverlay = viewModel::requestOverlayPermission
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+    }
+}
+
+@Composable
+private fun Header(greeting: String, date: String) {
+    Surface(color = MaterialTheme.colorScheme.primary, tonalElevation = 0.dp) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            Modifier.fillMaxWidth().padding(start = 24.dp, end = 20.dp, top = 28.dp, bottom = 24.dp),
+            horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text(
-                    text = "Selamat pagi",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                )
-                Text(
-                    text = "Senin, 22 Oktober 2025",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
-                )
+                Text(greeting, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = .8f), fontSize = 20.sp)
+                Text("Teman Seremind", color = MaterialTheme.colorScheme.onPrimary,
+                    style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text(date.replaceFirstChar { it.uppercase() },
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = .8f))
             }
-
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surface),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Notifications,
-                    contentDescription = "Notifikasi",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-
-        // Large Sage Green Summary Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary)
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = "${uiState.cancelledCount + uiState.openedCount} kali kamu melewati gerbang hari ini",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-
-                // Segmented progress bar
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f)),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    val total = maxOf(1, uiState.cancelledCount + uiState.openedCount)
-                    val cancelledWeight = uiState.cancelledCount.toFloat() / total
-                    val openedWeight = uiState.openedCount.toFloat() / total
-
-                    if (cancelledWeight > 0f) {
-                        Box(
-                            modifier = Modifier
-                                .weight(cancelledWeight)
-                                .fillMaxHeight()
-                                .background(MaterialTheme.colorScheme.onPrimary)
-                        )
-                    }
-                    if (openedWeight > 0f) {
-                        Box(
-                            modifier = Modifier
-                                .weight(openedWeight)
-                                .fillMaxHeight()
-                                .background(MaterialTheme.colorScheme.secondary)
-                        )
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "✓ ${uiState.cancelledCount} dicegah",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
-                    )
-                    Text(
-                        text = "⚡ ${uiState.openedCount} dibuka",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
-                    )
-                }
-            }
-        }
-
-        // Two Cards Side-by-Side: Momen Paling Rawan & Aplikasi Target
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Momen Paling Rawan
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(180.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Momen Paling Rawan",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
-                    Column {
-                        Text(
-                            text = if (uiState.peakHour != "-") uiState.peakHour else "22.00 - 23.00",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Alasan: Bosan",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-            }
-
-            // Aplikasi Target
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(180.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Aplikasi Target",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
-                    if (uiState.activeTargets.isEmpty()) {
-                        Text(
-                            text = "Belum ada aplikasi target.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            uiState.activeTargets.take(3).forEach { target ->
-                                AppRankItem(packageName = target.packageName, name = target.appName, delay = "${target.delaySeconds}s")
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Refleksi Hari Ini Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        text = "Refleksi Hari Ini",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Text(
-                    text = uiState.aiPrompt,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    lineHeight = 22.sp
-                )
-
-                Button(
-                    onClick = { onNavigateToJournal(uiState.aiPrompt) },
-                    shape = RoundedCornerShape(50),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    modifier = Modifier.align(Alignment.End)
-                ) {
-                    Text("Jawab", fontWeight = FontWeight.Bold)
-                }
+            Box(Modifier.size(58.dp).clip(CircleShape)
+                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = .16f)),
+                contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(30.dp))
             }
         }
     }
 }
 
 @Composable
-fun AppRankItem(packageName: String, name: String, delay: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f)
-        ) {
-            AppIcon(
-                packageName = packageName,
-                appName = name,
-                modifier = Modifier
-                    .size(24.dp)
-                    .clip(CircleShape)
+private fun SummaryCard(total: Int, cancelled: Int, opened: Int) {
+    Card(Modifier.fillMaxWidth(), RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
+        Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text("$total", fontSize = 54.sp, fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(10.dp))
+                Text("kali kamu melewati gerbang hari ini", modifier = Modifier.padding(bottom = 10.dp),
+                    style = MaterialTheme.typography.titleMedium)
+            }
+            val safeRatio = if (total == 0) 0f else cancelled.toFloat() / total
+            LinearProgressIndicator(
+                progress = { safeRatio },
+                modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(50)),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.secondary.copy(alpha = .35f)
             )
-            Text(
-                text = name,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
-                maxLines = 1
-            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("$cancelled dicegah", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                Text("$opened dibuka", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
+            }
         }
-        Text(
-            text = delay,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Bold,
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.primary
-        )
+    }
+}
+
+@Composable
+private fun ShortcutRow(
+    onJournal: () -> Unit, onStatistics: () -> Unit, onApps: () -> Unit, onArticles: () -> Unit
+) {
+    val items = listOf(
+        Triple(Icons.Default.Star, "Jurnal", onJournal),
+        Triple(Icons.Default.Star, "Statistik", onStatistics),
+        Triple(Icons.Default.List, "Aplikasi", onApps),
+        Triple(Icons.Default.Star, "Artikel", onArticles)
+    )
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        items.forEach { (icon, label, action) ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(68.dp)) {
+                IconButton(onClick = action, modifier = Modifier.size(58.dp).clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = .16f))) {
+                    Icon(icon, label, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+                }
+                Text(label, fontSize = 12.sp, textAlign = TextAlign.Center)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PermissionNotice(hasUsage: Boolean, hasOverlay: Boolean, onUsage: () -> Unit, onOverlay: () -> Unit) {
+    Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Izin diperlukan agar Seremind dapat bekerja", fontWeight = FontWeight.Bold)
+            if (!hasUsage) TextButton(onClick = onUsage) { Text("Aktifkan Akses Penggunaan") }
+            if (!hasOverlay) TextButton(onClick = onOverlay) { Text("Aktifkan Overlay") }
+        }
+    }
+}
+
+@Composable
+fun AppRankItem(packageName: String, name: String, delay: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            AppIcon(packageName, name, modifier = Modifier.size(36.dp).clip(CircleShape))
+            Text(name, fontWeight = FontWeight.Medium)
+        }
+        Text("Jeda $delay", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
     }
 }

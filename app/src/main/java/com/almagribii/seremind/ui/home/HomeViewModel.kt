@@ -22,6 +22,7 @@ data class HomeUiState(
     val openedCount: Int = 0,
     val cancelledCount: Int = 0,
     val peakHour: String = "-",
+    val peakReason: String = "-",
     val aiPrompt: String = "Apa hal berharga yang kamu lewatkan hari ini karena sibuk menatap layar?",
     val activeTargets: List<AppTarget> = emptyList(),
     val hasUsagePermission: Boolean = true,
@@ -72,6 +73,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val opened = gateDao.getOpenedCount(startOfDay)
             val cancelled = gateDao.getCancelledCount(startOfDay)
             val hourly = gateDao.getHourlyDistribution(startOfDay)
+            val reasons = gateDao.getReasonDistribution(startOfDay)
             val peak = findPeakHour(hourly)
             val targets = appTargetDao.getActiveTargets()
 
@@ -81,6 +83,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 openedCount = opened,
                 cancelledCount = cancelled,
                 peakHour = peak,
+                peakReason = reasons.firstOrNull()?.reason ?: "-",
                 aiPrompt = prompt,
                 activeTargets = targets,
                 hasUsagePermission = hasUsage,
