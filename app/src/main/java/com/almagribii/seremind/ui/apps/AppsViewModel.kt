@@ -71,7 +71,10 @@ class AppsViewModel(application: Application) : AndroidViewModel(application) {
             // Check if already exists
             val existing = appTargetDao.getTargetByPackage(packageName)
             if (existing == null) {
-                val newTarget = AppTarget(packageName = packageName, appName = appName, isActive = true, delaySeconds = delaySeconds)
+                val configuredDelay = SeremindDatabase.getDatabase(getApplication<Application>())
+                    .userPreferenceDao().getPreference("default_delay")?.toIntOrNull()
+                    ?.coerceIn(3, 30) ?: delaySeconds
+                val newTarget = AppTarget(packageName = packageName, appName = appName, isActive = true, delaySeconds = configuredDelay)
                 appTargetDao.insert(newTarget)
                 loadTargets()
             }

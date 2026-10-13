@@ -95,6 +95,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             database.journalEntryDao().deleteAll()
             database.recoveryEventDao().deleteAll()
             database.appTargetDao().deleteAll()
+            database.userPreferenceDao().deleteAll()
             withContext(Dispatchers.Main) { onComplete() }
         }
     }
@@ -151,13 +152,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         if (!PermissionHelper.hasOverlayPermission(context)) {
             PermissionHelper.requestOverlayPermission(context)
         } else {
-            val intent = Intent(context, GateOverlayActivity::class.java).apply {
-                putExtra("package_name", context.packageName)
-                putExtra("app_name", "Seremind (Test)")
-                putExtra("delay_seconds", 5)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            viewModelScope.launch(Dispatchers.IO) {
+                val delay = prefDao.getPreference("default_delay")?.toIntOrNull()?.coerceIn(3, 30) ?: 5
+                withContext(Dispatchers.Main) {
+                    val intent = Intent(context, GateOverlayActivity::class.java).apply {
+                        putExtra("package_name", context.packageName)
+                        putExtra("app_name", "Seremind (Test)")
+                        putExtra("delay_seconds", delay)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                }
             }
-            context.startActivity(intent)
         }
     }
 }

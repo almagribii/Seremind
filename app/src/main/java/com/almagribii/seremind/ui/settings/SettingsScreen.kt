@@ -33,6 +33,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val view = LocalView.current
     var dialog by remember { mutableStateOf<String?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showPrivacyInfo by remember { mutableStateOf(false) }
     var deleted by remember { mutableStateOf(false) }
 
     DisposableEffect(view) {
@@ -49,7 +50,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             .verticalScroll(rememberScrollState())
     ) {
         SettingsHeader()
-        Column(Modifier.padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             ProfileCard()
             SettingsGroup("Pengaturan Umum") {
                 SettingRow(Icons.Default.Info, "Durasi jeda default", "${state.defaultDelay} detik") { dialog = "delay" }
@@ -76,7 +77,9 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 SettingSwitchRow(Icons.Default.Lock, "Refleksi jurnal dengan AI", state.aiJournalEnabled) {
                     viewModel.setToggle("ai_journal_enabled", it)
                 }
-                SettingRow(Icons.Default.Lock, "Penyimpanan jurnal", "Jurnal tersimpan lokal; AI hanya aktif dengan izinmu") {}
+                SettingRow(Icons.Default.Lock, "Penyimpanan jurnal", "Jurnal tersimpan lokal; AI hanya aktif dengan izinmu") {
+                    showPrivacyInfo = true
+                }
                 SettingRow(Icons.Default.Share, "Ekspor data", "Bagikan salinan data lokal") { viewModel.exportData(context) }
                 SettingRow(Icons.Default.Delete, "Hapus semua data", "Tidak dapat dibatalkan", destructive = true) {
                     showDeleteConfirm = true
@@ -84,10 +87,12 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             }
             SettingsGroup("Tentang") {
                 SettingRow(Icons.Default.Info, "Versi", "1.0.0") {}
-                SettingRow(Icons.Default.Lock, "Kebijakan privasi", "Data lokal dan privasi pengguna") {}
+                SettingRow(Icons.Default.Lock, "Kebijakan privasi", "Data lokal dan privasi pengguna") {
+                    showPrivacyInfo = true
+                }
             }
             if (deleted) Text("Semua data lokal telah dihapus.", color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(70.dp))
         }
     }
 
@@ -96,13 +101,15 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         val initial = when (dialog) {
             "delay" -> state.defaultDelay.toString()
             "schedule" -> state.blockingSchedule
-            else -> state.dailyBudget
+            else -> state.dailyBudget.filter(Char::isDigit)
         }
         EditSettingDialog(title, initial, dialog == "delay", onDismiss = { dialog = null }) { value ->
             when (dialog) {
                 "delay" -> value.toIntOrNull()?.coerceIn(3, 30)?.let(viewModel::setDefaultDelay)
                 "schedule" -> viewModel.setSchedule(value)
-                "budget" -> viewModel.setBudget(value)
+                "budget" -> value.filter(Char::isDigit).toIntOrNull()?.coerceIn(1, 1440)?.let {
+                    viewModel.setBudget("$it menit")
+                }
             }
             dialog = null
         }
@@ -121,14 +128,28 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Batal") } }
         )
     }
+    if (showPrivacyInfo) {
+        AlertDialog(
+            onDismissRequest = { showPrivacyInfo = false },
+            title = { Text("Privasi dan data") },
+            text = {
+                Text(
+                    "Gate dan jurnal disimpan di perangkat. Isi jurnal hanya dikirim ke Gemini ketika Refleksi jurnal dengan AI diaktifkan. Kamu dapat mematikannya kapan saja."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showPrivacyInfo = false }) { Text("Mengerti") }
+            }
+        )
+    }
 }
 
 @Composable
 private fun SettingsHeader() {
     Surface(color = MaterialTheme.colorScheme.primary) {
-        Column(Modifier.fillMaxWidth().padding(start = 28.dp, top = 24.dp, bottom = 38.dp)) {
+        Column(Modifier.fillMaxWidth().padding(start = 20.dp, top = 40.dp, bottom = 30.dp)) {
             Text("Pengaturan", color = MaterialTheme.colorScheme.onPrimary,
-                style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text("Atur Seremind sesuai kebutuhanmu", color = MaterialTheme.colorScheme.onPrimary.copy(alpha = .82f))
         }
     }
@@ -136,7 +157,7 @@ private fun SettingsHeader() {
 
 @Composable
 private fun ProfileCard() {
-    Card(Modifier.fillMaxWidth().offset(y = (-20).dp), RoundedCornerShape(16.dp),
+    Card(Modifier.fillMaxWidth().offset(y = (-14).dp), RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(5.dp)) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -157,7 +178,7 @@ private fun ProfileCard() {
 private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-        Card(Modifier.fillMaxWidth(), RoundedCornerShape(12.dp),
+        Card(Modifier.fillMaxWidth(), RoundedCornerShape(14.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
             Column(content = content)
         }
@@ -172,15 +193,21 @@ private fun SettingRow(
     destructive: Boolean = false,
     onClick: () -> Unit
 ) {
-    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 3.dp)) {
+    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
             Column(Modifier.weight(1f).padding(start = 10.dp)) {
                 Text(title, color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
-                if (destructive) Text(value, fontSize = 11.sp, color = MaterialTheme.colorScheme.error.copy(alpha = .7f))
+                if (destructive || value.length > 28) {
+                    Text(
+                        value,
+                        fontSize = 11.sp,
+                        color = if (destructive) MaterialTheme.colorScheme.error.copy(alpha = .7f)
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = .6f)
+                    )
+                }
             }
-            Text(value.takeIf { !destructive } ?: "›", fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = .65f))
+            Text("›", fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .65f))
         }
     }
 }
