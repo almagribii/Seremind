@@ -35,8 +35,8 @@ fun ArticlesTab(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
             text = "Artikel",
@@ -79,7 +79,7 @@ fun ArticlesTab(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
+                            .padding(12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -144,6 +144,9 @@ fun ArticlesTab(
                     }
                 }
             }
+
         }
+        Spacer(Modifier.height(70.dp))
+
     }
 }

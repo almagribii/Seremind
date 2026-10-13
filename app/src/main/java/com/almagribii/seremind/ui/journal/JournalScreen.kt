@@ -48,7 +48,9 @@ fun JournalScreen(
             )
             else -> ArticlesTab(uiState.articles, onArticleClick = { onNavigateToArticle(it.id) })
         }
+
     }
+
 }
 
 @Composable
