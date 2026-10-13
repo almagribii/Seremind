@@ -102,12 +102,12 @@ fun HomeScreen(
                 }
             }
 
-            Text("Momen Paling Rawan", style = MaterialTheme.typography.headlineSmall,
+            Text("Momen Paling Rawan", style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(10.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
             ) {
                 Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -116,7 +116,7 @@ fun HomeScreen(
                     Spacer(Modifier.width(14.dp))
                     Column {
                         Text(if (state.peakHour == "-") "Belum ada data" else state.peakHour,
-                            style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text(
                             if (state.peakReason == "-") "Belum ada alasan tercatat"
                             else "Alasan terbanyak: ${state.peakReason}",
@@ -126,7 +126,7 @@ fun HomeScreen(
                 }
             }
 
-            Text("Aplikasi Target Aktif", style = MaterialTheme.typography.headlineSmall,
+            Text("Aplikasi Target Aktif", style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold)
             if (state.activeTargets.isEmpty()) {
                 Text("Belum ada aplikasi target. Tambahkan dari menu Aplikasi.",
