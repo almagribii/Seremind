@@ -4,6 +4,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withContext
 import com.almagribii.seremind.data.local.entity.GateEvent
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -13,9 +16,14 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class GeminiApiService(private val apiKey: String = "") {
+    data class JournalFeedbackResult(val feedback: String? = null, val error: String? = null)
+    private data class TextResponse(val text: String? = null, val error: String? = null)
 
     private val client = OkHttpClient.Builder()
         .callTimeout(3, TimeUnit.SECONDS)
+        .build()
+    private val journalClient = OkHttpClient.Builder()
+        .callTimeout(15, TimeUnit.SECONDS)
         .build()
 
     suspend fun generateGateStatement(
@@ -68,6 +76,7 @@ class GeminiApiService(private val apiKey: String = "") {
                 })
             })
         }
+
         val request = Request.Builder()
             .url(url)
             .post(jsonBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
@@ -88,6 +97,90 @@ class GeminiApiService(private val apiKey: String = "") {
                 ?.trim()
                 ?.takeIf { it.isNotBlank() }
         }
+    }
+
+        suspend fun generateJournalFeedback(
+            journalContent: String,
+            gateEvents: List<GateEvent>
+        ): JournalFeedbackResult = withContext(Dispatchers.IO) {
+            if (apiKey.isBlank()) return@withContext JournalFeedbackResult(error = "AI Jurnal belum tersedia karena API key belum dikonfigurasi.")
+            try {
+                withTimeout(15_000) {
+                    val gateSummary = if (gateEvents.isEmpty()) {
+                        "Belum ada aktivitas gate hari ini."
+                    } else {
+                        val appCounts = gateEvents.groupingBy { it.packageName }.eachCount()
+                            .entries.joinToString { "${it.key} ${it.value}x" }
+                        val reasonCounts = gateEvents.groupingBy { it.reason }.eachCount()
+                            .entries.joinToString { "\"${it.key}\" ${it.value}x" }
+                        val hours = gateEvents.groupingBy {
+                            SimpleDateFormat("HH", Locale.getDefault()).format(Date(it.timestamp))
+                        }.eachCount().entries.joinToString { "${it.key}.00 ${it.value}x" }
+                        "Aplikasi: $appCounts. Alasan: $reasonCounts. Jam: $hours."
+                    }
+                    val prompt = """
+                        Beri respons jurnal dalam Bahasa Indonesia dengan tepat dua bagian:
+                        1) satu observasi yang mengutip inti tulisan pengguna dan menghubungkannya
+                        dengan data gate hari ini secara hati-hati;
+                        2) satu pertanyaan lanjutan yang terbuka.
+                        Tulisan pengguna: "$journalContent"
+                        Data gate hari ini: $gateSummary
+                        Gunakan "mungkin" atau "bisa jadi", bukan kepastian. Jangan menghakimi,
+                        mendiagnosis, memberi nasihat medis, memaksa, atau menyarankan tindakan.
+                        Format: satu paragraf singkat berisi observasi lalu pertanyaan. Maksimal 320 karakter.
+                    """.trimIndent()
+                    val response = requestJournalText(prompt)
+                    response.text?.let { JournalFeedbackResult(feedback = it) }
+                        ?: JournalFeedbackResult(
+                            error = response.error ?: "Gemini tidak memberikan respons. Jurnal tetap tersimpan."
+                        )
+                }
+            } catch (error: Exception) {
+                JournalFeedbackResult(error = "AI tidak dapat memproses jurnal: ${error.userMessage()}")
+            }
+        }
+
+    private fun requestJournalText(prompt: String): TextResponse {
+        if (apiKey.isBlank()) return TextResponse(error = "API key AI Jurnal belum tersedia di aplikasi.")
+        return try {
+            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=$apiKey"
+            val body = JSONObject().apply {
+                put("contents", JSONArray().put(JSONObject().apply {
+                    put("parts", JSONArray().put(JSONObject().put("text", prompt)))
+                }))
+            }
+            val request = Request.Builder()
+                .url(url)
+                .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+            journalClient.newCall(request).execute().use { response ->
+                val rawBody = response.body?.string().orEmpty()
+                if (!response.isSuccessful) {
+                    val apiMessage = runCatching {
+                        JSONObject(rawBody).optJSONObject("error")?.optString("message")
+                    }.getOrNull().orEmpty()
+                    return@use TextResponse(
+                        error = "Gemini menolak permintaan (${response.code}): ${
+                            apiMessage.ifBlank { "respons server tidak valid" }
+                        }"
+                    )
+                }
+                val text = JSONObject(rawBody)
+                    .optJSONArray("candidates")?.takeIf { it.length() > 0 }
+                    ?.getJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts")
+                    ?.takeIf { it.length() > 0 }?.getJSONObject(0)?.optString("text")
+                    ?.trim()?.takeIf { it.isNotBlank() }
+                TextResponse(text = text, error = if (text == null) "Format respons Gemini tidak dikenali." else null)
+            }
+        } catch (error: Exception) {
+            TextResponse(error = "Koneksi ke Gemini gagal: ${error.userMessage()}")
+        }
+    }
+
+    private fun Exception.userMessage(): String = when (this) {
+        is java.net.UnknownHostException -> "tidak ada koneksi internet."
+        is java.net.SocketTimeoutException -> "waktu tunggu habis."
+        else -> message?.takeIf { it.isNotBlank() } ?: "terjadi kesalahan yang tidak diketahui."
     }
 
     suspend fun generateRecoveryResponse(emotion: String): String = withContext(Dispatchers.IO) {

@@ -60,9 +60,13 @@ val localProperties = Properties().apply {
 val overlayGeminiApiKey = localProperties.getProperty("GEMINI_API_KEY_OVERLAY", "")
     .replace("\\", "\\\\")
     .replace("\"", "\\\"")
+val journalGeminiApiKey = localProperties.getProperty("GEMINI_API_KEY_JURNAL", "")
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
 
 android.defaultConfig {
     buildConfigField("String", "GEMINI_API_KEY_OVERLAY", "\"$overlayGeminiApiKey\"")
+    buildConfigField("String", "GEMINI_API_KEY_JURNAL", "\"$journalGeminiApiKey\"")
 }
 
 dependencies {

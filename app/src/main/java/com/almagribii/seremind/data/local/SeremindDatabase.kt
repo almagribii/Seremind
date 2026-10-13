@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
         Article::class,
         UserPreference::class
     ],
-    version = 1,
+    version = 3,
     exportSchema = false
 )
 abstract class SeremindDatabase : RoomDatabase() {
@@ -53,10 +53,25 @@ abstract class SeremindDatabase : RoomDatabase() {
                     SeremindDatabase::class.java,
                     "seremind_database"
                 )
+                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_2_3)
                     .addCallback(DatabaseCallback())
                     .build()
                 INSTANCE = instance
                 instance
+            }
+
+        }
+
+        private val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE journal_entries ADD COLUMN ai_feedback TEXT")
+            }
+        }
+
+        private val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE journal_entries ADD COLUMN ai_feedback_error TEXT")
             }
         }
 

@@ -25,6 +25,7 @@ data class SettingsUiState(
     ,val focusMode: Boolean = false
     ,val reflectionReminder: Boolean = true
     ,val weeklySummary: Boolean = true
+    ,val aiJournalEnabled: Boolean = false
     ,val blockingSchedule: String = "22.00 - 06.00"
     ,val dailyBudget: String = "Belum diatur"
 )
@@ -50,6 +51,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 focusMode = prefDao.getPreference("focus_mode") == "true",
                 reflectionReminder = prefDao.getPreference("reflection_reminder") != "false",
                 weeklySummary = prefDao.getPreference("weekly_summary") != "false",
+                aiJournalEnabled = prefDao.getPreference("ai_journal_enabled") == "true",
                 blockingSchedule = prefDao.getPreference("blocking_schedule") ?: "22.00 - 06.00",
                 dailyBudget = prefDao.getPreference("daily_budget") ?: "Belum diatur"
             )
@@ -66,6 +68,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 "focus_mode" -> _uiState.value.copy(focusMode = value)
                 "reflection_reminder" -> _uiState.value.copy(reflectionReminder = value)
                 "weekly_summary" -> _uiState.value.copy(weeklySummary = value)
+                "ai_journal_enabled" -> _uiState.value.copy(aiJournalEnabled = value)
                 else -> _uiState.value
             }
         }

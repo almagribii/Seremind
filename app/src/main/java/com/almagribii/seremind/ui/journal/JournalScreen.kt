@@ -1,6 +1,8 @@
 package com.almagribii.seremind.ui.journal
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -40,6 +42,7 @@ fun JournalScreen(
                 entries = uiState.entries,
                 onNewEntry = { onNavigateToEditor(null) },
                 onEntryClick = { onNavigateToDetail(it.id) },
+                onDeleteEntry = { viewModel.deleteEntry(it) },
                 onAskPrompt = { onNavigateToEditor(uiState.currentPrompt ?: "Apa satu hal yang kamu syukuri hari ini?") },
                 currentPrompt = uiState.currentPrompt
             )
@@ -88,6 +91,7 @@ fun JournalEntriesTab(
     entries: List<JournalEntry>,
     onNewEntry: () -> Unit,
     onEntryClick: (JournalEntry) -> Unit,
+    onDeleteEntry: (JournalEntry) -> Unit,
     onAskPrompt: () -> Unit,
     currentPrompt: String?
 ) {
@@ -126,7 +130,7 @@ fun JournalEntriesTab(
                 item { Text("Hari Ini", fontSize = 18.sp, fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground) }
                 items(entries, key = { it.id }) { entry ->
-                    JournalEntryCard(entry, dateFormat, onEntryClick)
+                    JournalEntryCard(entry, dateFormat, onEntryClick, onDeleteEntry)
                 }
             }
         }
@@ -146,8 +150,13 @@ fun JournalEntriesTab(
 }
 
 @Composable
-private fun JournalEntryCard(entry: JournalEntry, dateFormat: SimpleDateFormat, onClick: (JournalEntry) -> Unit) {
-    Card(onClick = { onClick(entry) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(13.dp),
+@OptIn(ExperimentalFoundationApi::class)
+private fun JournalEntryCard(entry: JournalEntry, dateFormat: SimpleDateFormat, onClick: (JournalEntry) -> Unit, onDelete: (JournalEntry) -> Unit) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    Card(modifier = Modifier
+        .fillMaxWidth()
+        .combinedClickable(onClick = { onClick(entry) }, onLongClick = { showDeleteConfirm = true }),
+        shape = RoundedCornerShape(13.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(2.dp)) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
@@ -161,6 +170,19 @@ private fun JournalEntryCard(entry: JournalEntry, dateFormat: SimpleDateFormat, 
                             Text(it, Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
                                 fontSize = 10.sp, color = MaterialTheme.colorScheme.onPrimary)
                         }
+                    }
+                    if (showDeleteConfirm) {
+                        AlertDialog(
+                            onDismissRequest = { showDeleteConfirm = false },
+                            title = { Text("Hapus catatan?") },
+                            text = { Text("Catatan ini akan dihapus permanen.") },
+                            confirmButton = {
+                                TextButton(onClick = { onDelete(entry); showDeleteConfirm = false }) {
+                                    Text("Hapus", color = MaterialTheme.colorScheme.error)
+                                }
+                            },
+                            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Batal") } }
+                        )
                     }
                 }
                 Text(entry.content, maxLines = 3, style = MaterialTheme.typography.bodyMedium)

@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -18,23 +20,28 @@ fun JournalEditorScreen(
     initialPrompt: String?,
     onSaved: () -> Unit
 ) {
+    val uiState by viewModel.uiState.collectAsState()
     var content by remember { mutableStateOf("") }
     var selectedEmotion by remember { mutableStateOf<String?>(null) }
+    var showAiConsent by remember { mutableStateOf(false) }
     val emotions = listOf("Tenang", "Senang", "Lelah", "Cemas", "Bosan", "Stres")
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 20.dp, vertical = 18.dp),
+            .padding(horizontal = 20.dp, vertical = 34.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(
-            text = "Tulisanku",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Catatan baru", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text("Ruang aman untuk menulis apa adanya", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+            }
+            Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                Text("✦", modifier = Modifier.padding(10.dp), color = MaterialTheme.colorScheme.primary)
+            }
+        }
 
         if (initialPrompt != null) {
             Card(
@@ -65,6 +72,27 @@ fun JournalEditorScreen(
             )
         )
 
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        ) {
+            Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Refleksi dengan AI", fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "AI membaca tulisan ini dan gate hari ini untuk memberi observasi serta pertanyaan.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = .75f)
+                    )
+                }
+                Switch(
+                    checked = uiState.aiJournalEnabled,
+                    onCheckedChange = { if (it) showAiConsent = true else viewModel.setAiJournalEnabled(false) }
+                )
+            }
+        }
+
         Text(text = "Bagaimana perasaanmu saat ini?", style = MaterialTheme.typography.titleMedium,
             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
         Row(
@@ -89,14 +117,32 @@ fun JournalEditorScreen(
                         content = content,
                         emotionTag = selectedEmotion,
                         entryType = if (initialPrompt != null) "daily_prompt" else "free",
-                        aiPrompt = initialPrompt
+                        aiPrompt = initialPrompt,
+                        onComplete = onSaved
                     )
-                    onSaved()
                 }
             },
-            modifier = Modifier.fillMaxWidth()
+            enabled = content.isNotBlank() && !uiState.isLoading,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            shape = RoundedCornerShape(16.dp)
         ) {
-            Text("Simpan Jurnal")
+            if (uiState.isLoading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            else Text("Simpan Jurnal", fontWeight = FontWeight.Bold)
         }
+    }
+
+    if (showAiConsent) {
+        AlertDialog(
+            onDismissRequest = { showAiConsent = false },
+            title = { Text("Izinkan refleksi AI?") },
+            text = { Text("Isi jurnal dan ringkasan gate hari ini akan dikirim ke Gemini untuk membuat satu observasi dan satu pertanyaan. Kamu bisa mematikannya kapan saja di Pengaturan.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.setAiJournalEnabled(true)
+                    showAiConsent = false
+                }) { Text("Izinkan") }
+            },
+            dismissButton = { TextButton(onClick = { showAiConsent = false }) { Text("Batal") } }
+        )
     }
 }

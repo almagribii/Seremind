@@ -12,7 +12,10 @@ data class EmotionCount(val emotion_tag: String, val count: Int)
 @Dao
 interface JournalEntryDao {
     @Insert
-    suspend fun insert(entry: JournalEntry)
+    suspend fun insert(entry: JournalEntry): Long
+
+    @Query("SELECT * FROM journal_entries WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Int): JournalEntry?
 
     @Update
     suspend fun update(entry: JournalEntry)

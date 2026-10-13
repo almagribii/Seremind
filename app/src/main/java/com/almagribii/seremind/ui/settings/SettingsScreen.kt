@@ -73,7 +73,10 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 }
             }
             SettingsGroup("Privasi") {
-                SettingRow(Icons.Default.Lock, "Data disimpan lokal", "Data tidak pernah meninggalkan HP kamu") {}
+                SettingSwitchRow(Icons.Default.Lock, "Refleksi jurnal dengan AI", state.aiJournalEnabled) {
+                    viewModel.setToggle("ai_journal_enabled", it)
+                }
+                SettingRow(Icons.Default.Lock, "Penyimpanan jurnal", "Jurnal tersimpan lokal; AI hanya aktif dengan izinmu") {}
                 SettingRow(Icons.Default.Share, "Ekspor data", "Bagikan salinan data lokal") { viewModel.exportData(context) }
                 SettingRow(Icons.Default.Delete, "Hapus semua data", "Tidak dapat dibatalkan", destructive = true) {
                     showDeleteConfirm = true
