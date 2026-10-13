@@ -102,6 +102,9 @@ fun SeremindNavGraph(startDestination: String = Screen.Home.route) {
                     onNavigateToJournal = { prompt ->
                         navController.navigate(Screen.JournalEditor.createRoute(prompt))
                     },
+                    onNavigateToJournalScreen = {
+                        navController.navigate(Screen.Journal.route)
+                    },
                     onNavigateToApps = { navController.navigate(Screen.Apps.route) },
                     onNavigateToStatistics = { navController.navigate(Screen.Statistics.route) }
                 )
@@ -222,10 +225,14 @@ fun SeremindNavGraph(startDestination: String = Screen.Home.route) {
                 currentRoute = currentRoute,
                 onNavigate = { screen ->
                     if (currentRoute != screen.route) {
-                        navController.navigate(screen.route) {
-                            popUpTo(navController.graph.startDestinationId) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
+                        if (screen == Screen.Home) {
+                            navController.popBackStack(Screen.Home.route, inclusive = false)
+                        } else {
+                            navController.navigate(screen.route) {
+                                popUpTo(Screen.Home.route) { saveState = false }
+                                launchSingleTop = true
+                                restoreState = false
+                            }
                         }
                     }
                 }

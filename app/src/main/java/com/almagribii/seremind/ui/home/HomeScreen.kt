@@ -1,7 +1,12 @@
 package com.almagribii.seremind.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,11 +23,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import com.almagribii.seremind.R
+import kotlinx.coroutines.delay
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.findViewTreeLifecycleOwner
@@ -35,6 +45,7 @@ import java.util.Locale
 fun HomeScreen(
     viewModel: HomeViewModel,
     onNavigateToJournal: (String?) -> Unit,
+    onNavigateToJournalScreen: () -> Unit,
     onNavigateToApps: () -> Unit,
     onNavigateToStatistics: () -> Unit
 ) {
@@ -80,27 +91,11 @@ fun HomeScreen(
                 onArticles = { onNavigateToJournal(null) }
             )
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.78f)
-                )
-            ) {
-                Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Icon(Icons.Default.SelfImprovement, null, tint = MaterialTheme.colorScheme.onPrimary)
-                    Text("Refleksi Hari Ini", style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
-                    Text(state.aiPrompt, style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = .9f), lineHeight = 23.sp)
-                    OutlinedButton(
-                        onClick = { onNavigateToJournal(state.aiPrompt) },
-                        shape = RoundedCornerShape(50),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary),
-                        border = ButtonDefaults.outlinedButtonBorder
-                    ) { Text("Jawab", fontWeight = FontWeight.Bold) }
-                }
-            }
+            HomeBannerSlider(
+                onWelcome = {},
+                onReflection = onNavigateToJournalScreen,
+                onStatistics = onNavigateToStatistics
+            )
 
             Text("Momen Paling Rawan", style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
@@ -123,6 +118,7 @@ fun HomeScreen(
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = .7f)
                         )
                     }
+
                 }
             }
 
@@ -148,11 +144,84 @@ fun HomeScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun HomeBannerSlider(
+    onWelcome: () -> Unit,
+    onReflection: () -> Unit,
+    onStatistics: () -> Unit
+) {
+    val banners = listOf(
+        Triple(R.drawable.ban_selamat_datang, "Selamat datang", onWelcome),
+        Triple(R.drawable.banner_refleksi, "Refleksi", onReflection),
+        Triple(R.drawable.banner_statistik, "Statistik", onStatistics)
+    )
+    val pagerState = rememberPagerState(pageCount = { banners.size })
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(5_000)
+            pagerState.animateScrollToPage((pagerState.currentPage + 1) % banners.size)
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth().height(172.dp)
+        ) { page ->
+            val (image, description, action) = banners[page]
+            Card(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(22.dp))
+                    .clickable(onClick = action),
+                shape = RoundedCornerShape(22.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+            ) {
+                androidx.compose.foundation.Image(
+                    painter = painterResource(image),
+                    contentDescription = description,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            repeat(banners.size) { page ->
+                Box(
+                    Modifier
+                        .padding(horizontal = 3.dp)
+                        .size(if (page == pagerState.currentPage) 18.dp else 7.dp, 7.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (page == pagerState.currentPage) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outline.copy(alpha = .35f)
+                        )
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun Header(greeting: String, date: String) {
-    Surface(color = MaterialTheme.colorScheme.primary, tonalElevation = 0.dp) {
+    Box {
+        Image(
+            painter = painterResource(R.drawable.hero_atas),
+            contentDescription = null,
+            modifier = Modifier.matchParentSize(),
+            contentScale = ContentScale.Crop
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(Color.Black.copy(alpha = 0.28f))
+        )
         Row(
-        Modifier.fillMaxWidth().statusBarsPadding()
+        Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
             .padding(start = 24.dp, end = 20.dp, top = 28.dp, bottom = 24.dp),
             horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
         ) {
