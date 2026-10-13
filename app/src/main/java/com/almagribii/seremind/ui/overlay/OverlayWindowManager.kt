@@ -56,6 +56,10 @@ private class CustomLifecycleOwner : LifecycleOwner, ViewModelStoreOwner, SavedS
 }
 
 object OverlayWindowManager {
+    @Volatile
+    var isOverlayVisible: Boolean = false
+        private set
+
     private var windowManager: WindowManager? = null
     private var overlayView: ComposeView? = null
     private var lifecycleOwner: CustomLifecycleOwner? = null
@@ -118,6 +122,7 @@ object OverlayWindowManager {
         windowManager = wm
         overlayView = view
         lifecycleOwner = owner
+        isOverlayVisible = true
         view.setContent {
             SeremindTheme {
                 Surface(
@@ -164,6 +169,7 @@ object OverlayWindowManager {
         }
         overlayView = null
         windowManager = null
+        isOverlayVisible = false
         lifecycleOwner?.let {
             it.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
             it.handleLifecycleEvent(Lifecycle.Event.ON_STOP)

@@ -33,11 +33,16 @@ class AppDetectionService : Service() {
     private var activeAppSession: String? = null
     private var gateShownForSession = false
     private var launcherPackage: String? = null
+    private var pendingBackgroundPackage: String? = null
+    private var pendingBackgroundSince = 0L
+    private var pendingBackgroundEventTimestamp = 0L
+    private var handledBackgroundEventTimestamp = 0L
 
     companion object {
         const val CHANNEL_ID = "SeremindServiceChannel"
         const val NOTIFICATION_ID = 1001
         private const val TAG = "AppDetectionService"
+        private const val SESSION_EXIT_CONFIRMATION_MS = 1_500L
         fun startService(context: Context) {
             if (!PermissionHelper.hasUsageStatsPermission(context)) return
             try {
@@ -110,8 +115,68 @@ class AppDetectionService : Service() {
 
             while (isActive) {
                 try {
-                    val foregroundApp = UsageStatsHelper.getForegroundApp(applicationContext)
+                    val lifecycleState = UsageStatsHelper.getLatestAppLifecycleState(applicationContext)
+                    val foregroundApp = lifecycleState?.takeIf { it.isForeground }?.packageName
                     Log.d(TAG, "Polled foreground app: $foregroundApp (self package: $packageName)")
+
+                    val leftTargetDuringPollingWindow =
+                        activeAppSession != null &&
+                                lifecycleState?.foregroundPackages?.any { observedPackage ->
+                                    observedPackage != activeAppSession &&
+                                            (
+                                                observedPackage == launcherPackage ||
+                                                        !isTransientForegroundPackage(observedPackage)
+                                                )
+                                } == true
+
+                    if (leftTargetDuringPollingWindow && !OverlayWindowManager.isOverlayVisible) {
+                        activeAppSession = null
+                        gateShownForSession = false
+                        pendingBackgroundPackage = null
+                        pendingBackgroundSince = 0L
+                        pendingBackgroundEventTimestamp = 0L
+                        Log.d(TAG, "Target app session ended: another app was foreground during polling window")
+                    }
+
+                    if (lifecycleState != null &&
+                        !lifecycleState.isForeground &&
+                        lifecycleState.packageName == activeAppSession &&
+                        lifecycleState.timestamp > handledBackgroundEventTimestamp
+                    ) {
+                        if (OverlayWindowManager.isOverlayVisible) {
+                            handledBackgroundEventTimestamp = lifecycleState.timestamp
+                            pendingBackgroundPackage = null
+                            pendingBackgroundSince = 0L
+                            pendingBackgroundEventTimestamp = 0L
+                        } else if (
+                            pendingBackgroundPackage != lifecycleState.packageName ||
+                            pendingBackgroundEventTimestamp != lifecycleState.timestamp
+                        ) {
+                            pendingBackgroundPackage = lifecycleState.packageName
+                            pendingBackgroundSince = System.currentTimeMillis()
+                            pendingBackgroundEventTimestamp = lifecycleState.timestamp
+                            Log.d(TAG, "Possible target app exit detected; waiting for confirmation")
+                        } else if (
+                            System.currentTimeMillis() - pendingBackgroundSince >=
+                            SESSION_EXIT_CONFIRMATION_MS
+                        ) {
+                            activeAppSession = null
+                            gateShownForSession = false
+                            pendingBackgroundPackage = null
+                            pendingBackgroundSince = 0L
+                            handledBackgroundEventTimestamp = lifecycleState.timestamp
+                            pendingBackgroundEventTimestamp = 0L
+                            Log.d(TAG, "Target app session ended after confirmed background state")
+                        }
+                    } else if (
+                        lifecycleState?.isForeground == true &&
+                        lifecycleState.packageName == activeAppSession
+                    ) {
+                        pendingBackgroundPackage = null
+                        pendingBackgroundSince = 0L
+                        pendingBackgroundEventTimestamp = 0L
+                    }
+
                     if (foregroundApp != null && foregroundApp != packageName) {
                         val target = appTargetDao.getTargetByPackage(foregroundApp)
                         Log.d(TAG, "Database target check for $foregroundApp: found target = $target, isActive = ${target?.isActive}")
@@ -126,6 +191,9 @@ class AppDetectionService : Service() {
                             if (foregroundApp != activeAppSession) {
                                 activeAppSession = foregroundApp
                                 gateShownForSession = false
+                                pendingBackgroundPackage = null
+                                pendingBackgroundSince = 0L
+                                pendingBackgroundEventTimestamp = 0L
                             }
 
                             if (!gateShownForSession) {
@@ -158,10 +226,14 @@ class AppDetectionService : Service() {
                     } else if (
                         foregroundApp != null &&
                         activeAppSession != null &&
-                        !isTransientForegroundPackage(foregroundApp)
+                        (
+                            foregroundApp == launcherPackage ||
+                                    !isTransientForegroundPackage(foregroundApp)
+                            )
                     ) {
-                        // Only a different real app ends the session. System UI and
-                        // launcher events can occur while the target app is loading.
+                        // Returning to the launcher ends the target-app session.
+                        // System UI remains transient so internal app transitions
+                        // do not trigger another gate.
                         activeAppSession = null
                         gateShownForSession = false
                         Log.d(TAG, "Target app session ended: foreground app changed to $foregroundApp")
