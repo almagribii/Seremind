@@ -1,6 +1,7 @@
 package com.almagribii.seremind.ui.overlay
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -10,8 +11,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -21,6 +24,7 @@ import com.almagribii.seremind.data.local.entity.GateEvent
 import com.almagribii.seremind.data.remote.GeminiApiService
 import com.almagribii.seremind.BuildConfig
 import com.almagribii.seremind.util.AppIcon
+import com.almagribii.seremind.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -108,11 +112,34 @@ fun GateOverlay(
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
+            Box {
+                Image(
+                    painter = painterResource(R.drawable.logo),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(220.dp)
+                        .align(Alignment.Center)
+                        .alpha(0.07f)
+                )
+
             Column(
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    Text(
+                        text = "SEREMIND",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.8.sp,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+                    )
+                }
+
                 AppIcon(
                     packageName = packageName,
                     appName = appName,
@@ -254,6 +281,7 @@ fun GateOverlay(
                 ) {
                     Text("Tulis Jurnal Refleksi", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
+            }
             }
         }
     }
