@@ -1,7 +1,10 @@
 package com.almagribii.seremind.data.remote
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withContext
+import com.almagribii.seremind.data.local.entity.GateEvent
+import java.util.concurrent.TimeUnit
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -11,50 +14,80 @@ import org.json.JSONObject
 
 class GeminiApiService(private val apiKey: String = "") {
 
-    private val client = OkHttpClient()
+    private val client = OkHttpClient.Builder()
+        .callTimeout(3, TimeUnit.SECONDS)
+        .build()
 
-    suspend fun generateGateQuestion(appName: String, reason: String?): String = withContext(Dispatchers.IO) {
+    suspend fun generateGateStatement(
+        appName: String,
+        reason: String?,
+        recentEvents: List<GateEvent> = emptyList()
+    ): String = withContext(Dispatchers.IO) {
         if (apiKey.isBlank()) {
-            return@withContext getStaticGateQuestion(appName)
+            return@withContext getStaticGateStatement(appName)
         }
         try {
-            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=$apiKey"
-            val prompt = "Buat satu pertanyaan reflektif yang singkat, empatik, dan menenangkan (dalam Bahasa Indonesia) untuk seseorang yang hendak membuka aplikasi $appName. Tujuannya adalah membantu mereka menyadari niat mereka tanpa menghakimi."
-            
-            val jsonBody = JSONObject().apply {
-                put("contents", JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("parts", JSONArray().apply {
-                            put(JSONObject().apply {
-                                put("text", prompt)
-                            })
-                        })
-                    })
-                })
-            }
-
-            val requestBody = jsonBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
-            val request = Request.Builder().url(url).post(requestBody).build()
-
-            client.newCall(request).execute().use { response ->
-                if (response.isSuccessful && response.body != null) {
-                    val responseString = response.body!!.string()
-                    val jsonResponse = JSONObject(responseString)
-                    val candidates = jsonResponse.optJSONArray("candidates")
-                    if (candidates != null && candidates.length() > 0) {
-                        val content = candidates.getJSONObject(0).optJSONObject("content")
-                        val parts = content?.optJSONArray("parts")
-                        if (parts != null && parts.length() > 0) {
-                            val text = parts.getJSONObject(0).optString("text")
-                            if (text.isNotBlank()) return@withContext text.trim()
-                        }
-                    }
-                }
+            withTimeout(3_000) {
+                val history = recentEvents.take(10).joinToString("\n") { event ->
+                    "- alasan: ${event.reason}, hasil: ${event.action}"
+                }.ifBlank { "Belum ada riwayat gate untuk aplikasi ini." }
+                val previousStatements = recentEvents.mapNotNull { it.aiQuestion }
+                    .filter(String::isNotBlank)
+                    .distinct()
+                    .joinToString(" | ")
+                    .ifBlank { "Tidak ada." }
+                val prompt = """
+                    Buat satu pernyataan kesadaran singkat dalam Bahasa Indonesia untuk seseorang
+                    yang hendak membuka aplikasi "$appName". Gunakan konteks riwayat gate berikut:
+                    $history
+                    Pernyataan sebelumnya (jangan menirunya): $previousStatements
+                    Alasan yang baru dipilih: ${reason ?: "belum dipilih"}.
+                    Buat pernyataan yang berbeda, relevan dengan pola riwayat, empatik, netral,
+                    dan tidak menghakimi. Jangan gunakan tanda tanya. Jangan mendiagnosis, jangan
+                    memberi saran medis, dan jangan menyuruh pengguna melakukan tindakan tertentu.
+                    Maksimal 120 karakter.
+                    Variasi permintaan: ${System.currentTimeMillis()}.
+                    Keluarkan hanya pernyataannya.
+                """.trimIndent()
+                requestText(prompt)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            null
         }
-        getStaticGateQuestion(appName)
+            ?: getStaticGateStatement(appName)
+    }
+
+    private fun requestText(prompt: String): String? {
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey"
+        val jsonBody = JSONObject().apply {
+            put("contents", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("parts", JSONArray().apply {
+                        put(JSONObject().put("text", prompt))
+                    })
+                })
+            })
+        }
+        val request = Request.Builder()
+            .url(url)
+            .post(jsonBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+            .build()
+
+        return client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@use null
+            val candidates = response.body?.string()
+                ?.let(::JSONObject)
+                ?.optJSONArray("candidates")
+            candidates?.takeIf { it.length() > 0 }
+                ?.getJSONObject(0)
+                ?.optJSONObject("content")
+                ?.optJSONArray("parts")
+                ?.takeIf { it.length() > 0 }
+                ?.getJSONObject(0)
+                ?.optString("text")
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+        }
     }
 
     suspend fun generateRecoveryResponse(emotion: String): String = withContext(Dispatchers.IO) {
@@ -112,15 +145,15 @@ class GeminiApiService(private val apiKey: String = "") {
         prompts.random()
     }
 
-    private fun getStaticGateQuestion(appName: String): String {
-        val questions = listOf(
-            "Apa yang sebenarnya sedang kamu cari di $appName saat ini?",
-            "Apakah membuka $appName sekarang akan membuat hatimu lebih tenang?",
-            "Seberapa besar kebutuhanmu untuk membuka $appName detik ini?",
-            "Bagaimana jika kamu mengambil 3 napas dalam sebelum melanjutkan ke $appName?",
-            "Apakah ada hal lain di dunia nyata yang lebih ingin kamu selesaikan sekarang?"
+    private fun getStaticGateStatement(appName: String): String {
+        val statements = listOf(
+            "Dorongan untuk membuka $appName sedang muncul; kamu bisa menyadari apa yang sedang kamu butuhkan.",
+            "Sebelum membuka $appName, sadari apakah kamu sedang mencari sesuatu atau sekadar mengikuti kebiasaan.",
+            "Perhatianmu kembali tertuju pada $appName; ini kesempatan untuk melihat niatmu dengan lebih jelas.",
+            "Keinginan membuka $appName sedang hadir; kamu tetap punya ruang untuk memilih dengan sadar.",
+            "Kamu sedang menuju $appName; sadari hal yang ingin kamu dapatkan dari pilihan ini."
         )
-        return questions.random()
+        return statements.random()
     }
 
     private fun getStaticRecoveryResponse(emotion: String): String {

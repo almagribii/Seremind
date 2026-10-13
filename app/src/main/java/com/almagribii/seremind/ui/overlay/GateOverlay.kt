@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.sp
 import com.almagribii.seremind.data.local.SeremindDatabase
 import com.almagribii.seremind.data.local.entity.GateEvent
 import com.almagribii.seremind.data.remote.GeminiApiService
+import com.almagribii.seremind.BuildConfig
 import com.almagribii.seremind.util.AppIcon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -32,35 +33,34 @@ fun GateOverlay(
     delaySeconds: Int,
     onCancel: () -> Unit,
     onOpenAllowed: () -> Unit,
-    onWriteReflection: (question: String) -> Unit
+    onWriteReflection: (statement: String) -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val db = remember { SeremindDatabase.getDatabase(context) }
-    val geminiService = remember { GeminiApiService() }
+    val geminiService = remember { GeminiApiService(BuildConfig.GEMINI_API_KEY_OVERLAY) }
 
     var isLoading by remember { mutableStateOf(true) }
-    var question by remember { mutableStateOf("Apa yang sedang kamu cari?") }
+    var statement by remember { mutableStateOf("Kamu sedang menyadari niatmu sebelum membuka aplikasi ini.") }
     var selectedReason by remember { mutableStateOf<String?>(null) }
+    var customReason by remember { mutableStateOf("") }
     var countdownSeconds by remember { mutableStateOf(delaySeconds) }
     var isOpenedEnabled by remember { mutableStateOf(false) }
 
-    val reasons = listOf("Hiburan", "Bosan", "Cek Notifikasi", "Refleks Aja", "Cari Informasi")
+    val reasons = listOf("Hiburan", "Bosan", "Cek Notifikasi", "Refleks Aja", "Cari Informasi", "Lainnya")
 
     LaunchedEffect(packageName) {
         isLoading = true
         countdownSeconds = delaySeconds
         isOpenedEnabled = false
         selectedReason = null
+        customReason = ""
 
-        val fetchedQuestion = withContext(Dispatchers.IO) {
-            try {
-                geminiService.generateGateQuestion(appName, null)
-            } catch (e: Exception) {
-                "Apa yang sedang kamu cari?"
-            }
+        val fetchedStatement = withContext(Dispatchers.IO) {
+            val recentEvents = db.gateEventDao().getRecentEventsForPackage(packageName)
+            geminiService.generateGateStatement(appName, null, recentEvents)
         }
-        question = fetchedQuestion
+        statement = fetchedStatement
         isLoading = false
 
         var currentSec = delaySeconds
@@ -78,9 +78,13 @@ fun GateOverlay(
                 val event = GateEvent(
                     packageName = packageName,
                     timestamp = System.currentTimeMillis(),
-                    reason = selectedReason ?: "Lainnya",
+                    reason = if (selectedReason == "Lainnya") {
+                        customReason.trim().ifBlank { "Lainnya" }
+                    } else {
+                        selectedReason ?: "Lainnya"
+                    },
                     action = action,
-                    aiQuestion = question
+                    aiQuestion = statement
                 )
                 db.gateEventDao().insert(event)
             } catch (e: Exception) {
@@ -129,7 +133,7 @@ fun GateOverlay(
                     CircularProgressIndicator(modifier = Modifier.size(36.dp), color = MaterialTheme.colorScheme.primary)
                 } else {
                     Text(
-                        text = question,
+                        text = statement,
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center,
                         fontSize = 16.sp,
@@ -177,6 +181,18 @@ fun GateOverlay(
                     }
                 }
 
+                if (selectedReason == "Lainnya") {
+                    OutlinedTextField(
+                        value = customReason,
+                        onValueChange = { customReason = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Alasan kamu") },
+                        placeholder = { Text("Tulis alasanmu di sini") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
 
                 if (countdownSeconds > 0) {
@@ -213,7 +229,9 @@ fun GateOverlay(
                                 onOpenAllowed()
                             }
                         },
-                        enabled = isOpenedEnabled && selectedReason != null,
+                        enabled = isOpenedEnabled &&
+                                selectedReason != null &&
+                                (selectedReason != "Lainnya" || customReason.isNotBlank()),
                         modifier = Modifier
                             .weight(1f)
                             .height(50.dp),
@@ -230,7 +248,7 @@ fun GateOverlay(
                 TextButton(
                     onClick = {
                         recordAndExecute("cancelled") {
-                            onWriteReflection(question)
+                            onWriteReflection(statement)
                         }
                     }
                 ) {

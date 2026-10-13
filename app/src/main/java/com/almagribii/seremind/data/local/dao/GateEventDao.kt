@@ -19,6 +19,9 @@ interface GateEventDao {
     @Query("SELECT * FROM gate_events WHERE package_name = :packageName ORDER BY timestamp DESC")
     suspend fun getEventsForPackage(packageName: String): List<GateEvent>
 
+    @Query("SELECT * FROM gate_events WHERE package_name = :packageName ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getRecentEventsForPackage(packageName: String, limit: Int = 10): List<GateEvent>
+
     @Query("SELECT COUNT(*) FROM gate_events WHERE `action` = 'cancelled' AND timestamp >= :startTime")
     suspend fun getCancelledCount(startTime: Long): Int
 

@@ -26,13 +26,14 @@ class AppDetectionService : Service() {
 
     private val serviceJob = Job()
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
-    private var lastTriggeredPackage: String? = null
+    private var activeAppSession: String? = null
+    private var gateShownForSession = false
+    private var launcherPackage: String? = null
 
     companion object {
         const val CHANNEL_ID = "SeremindServiceChannel"
         const val NOTIFICATION_ID = 1001
         private const val TAG = "AppDetectionService"
-
         fun startService(context: Context) {
             if (!PermissionHelper.hasUsageStatsPermission(context)) return
             try {
@@ -62,6 +63,7 @@ class AppDetectionService : Service() {
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
+        launcherPackage = resolveLauncherPackage()
         startAppMonitoring()
     }
 
@@ -103,11 +105,17 @@ class AppDetectionService : Service() {
                         Log.d(TAG, "Database target check for $foregroundApp: found target = $target, isActive = ${target?.isActive}")
 
                         if (target != null && target.isActive) {
-                            // Trigger once per foreground entry. The state is reset when
-                            // the user leaves the target, so a quick re-entry is detected too.
-                            if (foregroundApp != lastTriggeredPackage) {
+                            // A target app session owns one gate. Internal navigation
+                            // (for example, opening a profile or another page) keeps
+                            // the same package and therefore must not show it again.
+                            if (foregroundApp != activeAppSession) {
+                                activeAppSession = foregroundApp
+                                gateShownForSession = false
+                            }
+
+                            if (!gateShownForSession) {
                                 Log.d(TAG, "Triggering overlay for target app: ${target.appName} (${target.packageName}) with delay ${target.delaySeconds}s")
-                                lastTriggeredPackage = foregroundApp
+                                gateShownForSession = true
                                 OverlayWindowManager.showOverlay(
                                     applicationContext,
                                     target.packageName,
@@ -115,14 +123,19 @@ class AppDetectionService : Service() {
                                     target.delaySeconds
                                 )
                             } else {
-                                Log.d(TAG, "Skipping overlay for $foregroundApp: triggered recently (cooldown active)")
+                                Log.d(TAG, "Skipping overlay for $foregroundApp: gate already shown in this app session")
                             }
-                        } else {
-                            Log.d(TAG, "No active target found in database for package: $foregroundApp")
                         }
-                    } else if (foregroundApp != packageName && foregroundApp != lastTriggeredPackage) {
-                        // Leaving the target arms the next entry, regardless of timing.
-                        lastTriggeredPackage = null
+                    } else if (
+                        foregroundApp != null &&
+                        activeAppSession != null &&
+                        !isTransientForegroundPackage(foregroundApp)
+                    ) {
+                        // Only a different real app ends the session. System UI and
+                        // launcher events can occur while the target app is loading.
+                        activeAppSession = null
+                        gateShownForSession = false
+                        Log.d(TAG, "Target app session ended: foreground app changed to $foregroundApp")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error in app monitoring loop", e)
@@ -143,4 +156,20 @@ class AppDetectionService : Service() {
         Log.d(TAG, "AppDetectionService onDestroy")
         serviceJob.cancel()
     }
+
+    private fun isTransientForegroundPackage(foregroundApp: String): Boolean {
+        return foregroundApp == packageName ||
+                foregroundApp == "android" ||
+                foregroundApp == "com.android.systemui" ||
+                foregroundApp == launcherPackage ||
+                foregroundApp.startsWith("com.android.systemui")
+    }
+
+    private fun resolveLauncherPackage(): String? {
+        val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_HOME)
+        }
+        return packageManager.resolveActivity(homeIntent, 0)?.activityInfo?.packageName
+    }
+
 }

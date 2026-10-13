@@ -196,7 +196,7 @@ fun OnboardingWelcomePage(onStartClick: () -> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "Alih-alih memblokir secara paksa, Seremind memberikan jeda singkat dan pertanyaan reflektif sebelum aplikasi target dibuka, membangunkan kesadaran sadar Anda.",
+            text = "Alih-alih memblokir secara paksa, Seremind memberikan jeda singkat dan pernyataan reflektif sebelum aplikasi target dibuka, membangunkan kesadaran sadar Anda.",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),

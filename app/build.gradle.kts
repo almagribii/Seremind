@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -40,12 +42,27 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+}
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use(::load)
+    }
+}
+val overlayGeminiApiKey = localProperties.getProperty("GEMINI_API_KEY_OVERLAY", "")
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
+
+android.defaultConfig {
+    buildConfigField("String", "GEMINI_API_KEY_OVERLAY", "\"$overlayGeminiApiKey\"")
 }
 
 dependencies {

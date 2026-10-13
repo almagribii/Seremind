@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.almagribii.seremind.data.local.SeremindDatabase
 import com.almagribii.seremind.data.local.entity.GateEvent
 import com.almagribii.seremind.data.remote.GeminiApiService
+import com.almagribii.seremind.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,7 +17,7 @@ import kotlinx.coroutines.launch
 data class GateOverlayUiState(
     val appName: String = "Aplikasi",
     val packageName: String = "",
-    val question: String = "Apa yang sedang kamu cari?",
+    val statement: String = "Kamu sedang menyadari niatmu sebelum membuka aplikasi ini.",
     val selectedReason: String? = null,
     val countdownSeconds: Int = 5,
     val isOpenedEnabled: Boolean = false,
@@ -26,7 +27,7 @@ data class GateOverlayUiState(
 class GateOverlayViewModel(application: Application) : AndroidViewModel(application) {
     private val db = SeremindDatabase.getDatabase(application)
     private val gateDao = db.gateEventDao()
-    private val geminiService = GeminiApiService()
+    private val geminiService = GeminiApiService(BuildConfig.GEMINI_API_KEY_OVERLAY)
 
     private val _uiState = MutableStateFlow(GateOverlayUiState())
     val uiState: StateFlow<GateOverlayUiState> = _uiState.asStateFlow()
@@ -41,8 +42,9 @@ class GateOverlayViewModel(application: Application) : AndroidViewModel(applicat
         )
 
         viewModelScope.launch(Dispatchers.IO) {
-            val q = geminiService.generateGateQuestion(appName, null)
-            _uiState.value = _uiState.value.copy(question = q, isLoading = false)
+            val recentEvents = gateDao.getRecentEventsForPackage(packageName)
+            val statement = geminiService.generateGateStatement(appName, null, recentEvents)
+            _uiState.value = _uiState.value.copy(statement = statement, isLoading = false)
 
             // Start countdown
             var currentSec = delaySeconds
@@ -67,7 +69,7 @@ class GateOverlayViewModel(application: Application) : AndroidViewModel(applicat
                 timestamp = System.currentTimeMillis(),
                 reason = state.selectedReason ?: "Lainnya",
                 action = action,
-                aiQuestion = state.question
+                aiQuestion = state.statement
             )
             gateDao.insert(event)
             viewModelScope.launch(Dispatchers.Main) {
