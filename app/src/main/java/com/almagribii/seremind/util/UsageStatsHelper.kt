@@ -13,7 +13,7 @@ object UsageStatsHelper {
         val packageName: String,
         val isForeground: Boolean,
         val timestamp: Long,
-        val foregroundPackages: List<String>
+        val foregroundEvents: List<Pair<String, Long>>
     )
 
     fun getForegroundApp(context: Context): String? {
@@ -35,7 +35,7 @@ object UsageStatsHelper {
         var lastApp: String? = null
         var lastEventWasBackground = false
         var lastEventTimestamp = 0L
-        val foregroundPackages = mutableListOf<String>()
+        val foregroundEvents = mutableListOf<Pair<String, Long>>()
 
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
@@ -44,7 +44,7 @@ object UsageStatsHelper {
                     lastApp = event.packageName
                     lastEventWasBackground = false
                     lastEventTimestamp = event.timeStamp
-                    foregroundPackages += event.packageName
+                    foregroundEvents += event.packageName to event.timeStamp
                     Log.d(TAG, "Activity resumed event: $lastApp")
                 } else if (
                     event.eventType == UsageEvents.Event.ACTIVITY_PAUSED ||
@@ -60,7 +60,7 @@ object UsageStatsHelper {
                     lastApp = event.packageName
                     lastEventWasBackground = false
                     lastEventTimestamp = event.timeStamp
-                    foregroundPackages += event.packageName
+                    foregroundEvents += event.packageName to event.timeStamp
                     Log.d(TAG, "Move to foreground event: $lastApp")
                 } else if (event.eventType == UsageEvents.Event.MOVE_TO_BACKGROUND) {
                     lastApp = event.packageName
@@ -77,7 +77,7 @@ object UsageStatsHelper {
                 packageName = lastApp,
                 isForeground = !lastEventWasBackground,
                 timestamp = lastEventTimestamp,
-                foregroundPackages = foregroundPackages
+                foregroundEvents = foregroundEvents
             )
         }
 

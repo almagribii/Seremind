@@ -37,6 +37,7 @@ class AppDetectionService : Service() {
     private var pendingBackgroundSince = 0L
     private var pendingBackgroundEventTimestamp = 0L
     private var handledBackgroundEventTimestamp = 0L
+    private var lastProcessedForegroundEventTimestamp = 0L
 
     companion object {
         const val CHANNEL_ID = "SeremindServiceChannel"
@@ -119,63 +120,30 @@ class AppDetectionService : Service() {
                     val foregroundApp = lifecycleState?.takeIf { it.isForeground }?.packageName
                     Log.d(TAG, "Polled foreground app: $foregroundApp (self package: $packageName)")
 
-                    val leftTargetDuringPollingWindow =
-                        activeAppSession != null &&
-                                lifecycleState?.foregroundPackages?.any { observedPackage ->
-                                    observedPackage != activeAppSession &&
-                                            (
-                                                observedPackage == launcherPackage ||
-                                                        !isTransientForegroundPackage(observedPackage)
-                                                )
-                                } == true
-
-                    if (leftTargetDuringPollingWindow && !OverlayWindowManager.isOverlayVisible) {
-                        activeAppSession = null
-                        gateShownForSession = false
-                        pendingBackgroundPackage = null
-                        pendingBackgroundSince = 0L
-                        pendingBackgroundEventTimestamp = 0L
-                        Log.d(TAG, "Target app session ended: another app was foreground during polling window")
-                    }
-
-                    if (lifecycleState != null &&
-                        !lifecycleState.isForeground &&
-                        lifecycleState.packageName == activeAppSession &&
-                        lifecycleState.timestamp > handledBackgroundEventTimestamp
-                    ) {
-                        if (OverlayWindowManager.isOverlayVisible) {
-                            handledBackgroundEventTimestamp = lifecycleState.timestamp
-                            pendingBackgroundPackage = null
-                            pendingBackgroundSince = 0L
-                            pendingBackgroundEventTimestamp = 0L
-                        } else if (
-                            pendingBackgroundPackage != lifecycleState.packageName ||
-                            pendingBackgroundEventTimestamp != lifecycleState.timestamp
-                        ) {
-                            pendingBackgroundPackage = lifecycleState.packageName
-                            pendingBackgroundSince = System.currentTimeMillis()
-                            pendingBackgroundEventTimestamp = lifecycleState.timestamp
-                            Log.d(TAG, "Possible target app exit detected; waiting for confirmation")
-                        } else if (
-                            System.currentTimeMillis() - pendingBackgroundSince >=
-                            SESSION_EXIT_CONFIRMATION_MS
-                        ) {
-                            activeAppSession = null
-                            gateShownForSession = false
-                            pendingBackgroundPackage = null
-                            pendingBackgroundSince = 0L
-                            handledBackgroundEventTimestamp = lifecycleState.timestamp
-                            pendingBackgroundEventTimestamp = 0L
-                            Log.d(TAG, "Target app session ended after confirmed background state")
+                    lifecycleState?.foregroundEvents
+                        ?.filter { (_, timestamp) ->
+                            timestamp > lastProcessedForegroundEventTimestamp
                         }
-                    } else if (
-                        lifecycleState?.isForeground == true &&
-                        lifecycleState.packageName == activeAppSession
-                    ) {
-                        pendingBackgroundPackage = null
-                        pendingBackgroundSince = 0L
-                        pendingBackgroundEventTimestamp = 0L
-                    }
+                        ?.sortedBy { (_, timestamp) -> timestamp }
+                        ?.forEach { (observedPackage, timestamp) ->
+                            lastProcessedForegroundEventTimestamp = timestamp
+                            if (
+                                activeAppSession != null &&
+                                observedPackage != activeAppSession &&
+                                (
+                                    observedPackage == launcherPackage ||
+                                            !isTransientForegroundPackage(observedPackage)
+                                    ) &&
+                                !OverlayWindowManager.isOverlayVisible
+                            ) {
+                                activeAppSession = null
+                                gateShownForSession = false
+                                pendingBackgroundPackage = null
+                                pendingBackgroundSince = 0L
+                                pendingBackgroundEventTimestamp = 0L
+                                Log.d(TAG, "Target app session ended: foreground changed to $observedPackage")
+                            }
+                        }
 
                     if (foregroundApp != null && foregroundApp != packageName) {
                         val target = appTargetDao.getTargetByPackage(foregroundApp)
