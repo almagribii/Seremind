@@ -29,6 +29,8 @@ import com.almagribii.seremind.data.local.entity.GateEvent
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 
 private val categoryOrder = listOf("Media Sosial", "Video", "Game", "Lainnya")
 
@@ -199,7 +201,7 @@ private fun AppTargetRow(
             Column(Modifier.weight(1f).padding(start = 10.dp)) {
                 Text(target.appName, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Text(
-                    "Jeda: ${target.delaySeconds}s • Sesi: ${target.maxSessionMinutes}m • Istirahat: ${target.cooldownMinutes}m",
+                    "Jeda: ${target.delaySeconds}s • Sesi: ${target.maxSessionMinutes.takeIf { it > 0 } ?: "Nonaktif"} • Istirahat: ${target.cooldownMinutes.takeIf { it > 0 } ?: "Nonaktif"}",
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = .68f),
                     fontSize = 11.sp
                 )
@@ -232,6 +234,8 @@ private fun AppInteractionDialog(
     var selectedDelay by remember(target) { mutableIntStateOf(target.delaySeconds) }
     var selectedMaxSession by remember(target) { mutableIntStateOf(target.maxSessionMinutes) }
     var selectedCooldown by remember(target) { mutableIntStateOf(target.cooldownMinutes) }
+    var customMaxSession by remember(target) { mutableStateOf(if (target.maxSessionMinutes > 0) target.maxSessionMinutes.toString() else "") }
+    var customCooldown by remember(target) { mutableStateOf(if (target.cooldownMinutes > 0) target.cooldownMinutes.toString() else "") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -265,30 +269,60 @@ private fun AppInteractionDialog(
 
                 // 2. Max Session Minutes
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Batas waktu sesi aktif: $selectedMaxSession menit", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    Text("Batas waktu sesi aktif: ${selectedMaxSession.takeIf { it > 0 } ?: "Nonaktif"}", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf(5, 10, 15, 30, 60).forEach { min ->
+                        listOf(0, 5, 10, 15, 30, 60).forEach { min ->
                             FilterChip(
                                 selected = selectedMaxSession == min,
-                                onClick = { selectedMaxSession = min },
-                                label = { Text("${min}m", fontSize = 11.sp) }
+                                onClick = {
+                                    selectedMaxSession = min
+                                    if (min == 0) customMaxSession = ""
+                                },
+                                label = { Text(if (min == 0) "Nonaktif" else "${min}m", fontSize = 11.sp) }
                             )
                         }
                     }
+                    OutlinedTextField(
+                        value = customMaxSession,
+                        onValueChange = {
+                            customMaxSession = it.filter(Char::isDigit)
+                            selectedMaxSession = customMaxSession.toIntOrNull()?.coerceAtLeast(1) ?: 0
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Atau isi menit sendiri") },
+                        suffix = { Text("menit") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true
+                    )
                 }
 
                 // 3. Cooldown Minutes
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Masa jeda istirahat wajib: $selectedCooldown menit", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    Text("Masa jeda istirahat wajib: ${selectedCooldown.takeIf { it > 0 } ?: "Nonaktif"}", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf(15, 30, 45, 60, 120).forEach { min ->
+                        listOf(0, 15, 30, 45, 60, 120).forEach { min ->
                             FilterChip(
                                 selected = selectedCooldown == min,
-                                onClick = { selectedCooldown = min },
-                                label = { Text("${min}m", fontSize = 11.sp) }
+                                onClick = {
+                                    selectedCooldown = min
+                                    if (min == 0) customCooldown = ""
+                                },
+                                label = { Text(if (min == 0) "Nonaktif" else "${min}m", fontSize = 11.sp) }
                             )
                         }
                     }
+                    OutlinedTextField(
+                        value = customCooldown,
+                        onValueChange = {
+                            customCooldown = it.filter(Char::isDigit)
+                            selectedCooldown = customCooldown.toIntOrNull()?.coerceAtLeast(1) ?: 0
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Atau isi menit sendiri") },
+                        suffix = { Text("menit") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true
+                    )
                 }
 
                 HorizontalDivider()
@@ -314,7 +348,11 @@ private fun AppInteractionDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    onSaveSettings(selectedDelay, selectedMaxSession, selectedCooldown)
+                    onSaveSettings(
+                        selectedDelay,
+                        customMaxSession.toIntOrNull()?.coerceAtLeast(1) ?: selectedMaxSession,
+                        customCooldown.toIntOrNull()?.coerceAtLeast(1) ?: selectedCooldown
+                    )
                     onDismiss()
                 }
             ) {

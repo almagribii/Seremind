@@ -39,6 +39,7 @@ fun GateOverlay(
     cooldownMinutes: Int = 30,
     isCooldownActive: Boolean = false,
     cooldownMinutesLeft: Int = 0,
+    cooldownRemainingSeconds: Int = cooldownMinutesLeft * 60,
     isWarningKick: Boolean = false,
     warningMessage: String? = null,
     onCancel: () -> Unit,
@@ -57,6 +58,7 @@ fun GateOverlay(
     var customReason by remember { mutableStateOf("") }
     var countdownSeconds by remember { mutableStateOf(delaySeconds) }
     var isOpenedEnabled by remember { mutableStateOf(false) }
+    var cooldownSeconds by remember { mutableStateOf(cooldownRemainingSeconds) }
 
     val reasons = listOf("Hiburan", "Bosan", "Cek Notifikasi", "Refleks Aja", "Cari Informasi", "Lainnya")
 
@@ -71,6 +73,7 @@ fun GateOverlay(
             val recentEvents = db.gateEventDao().getRecentEventsForPackage(packageName)
             geminiService.generateGateStatement(appName, null, recentEvents)
         }
+
         statement = fetchedStatement
         isLoading = false
 
@@ -81,6 +84,19 @@ fun GateOverlay(
             countdownSeconds = currentSec
         }
         isOpenedEnabled = true
+    }
+
+    LaunchedEffect(packageName, isCooldownActive, cooldownRemainingSeconds) {
+        if (isCooldownActive) {
+            var remaining = cooldownRemainingSeconds
+            cooldownSeconds = remaining
+            while (remaining > 0) {
+                delay(1000)
+                remaining--
+                cooldownSeconds = remaining
+            }
+        }
+
     }
 
     val recordAndExecute: (action: String, onSuccess: () -> Unit) -> Unit = { action, onSuccess ->
@@ -120,6 +136,21 @@ fun GateOverlay(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Box {
+                if (!isWarningKick && (isCooldownActive || countdownSeconds > 0)) {
+                    val remaining = if (isCooldownActive) cooldownSeconds else countdownSeconds
+                    val total = if (isCooldownActive) {
+                        cooldownRemainingSeconds.coerceAtLeast(1)
+                    } else {
+                        delaySeconds.coerceAtLeast(1)
+                    }
+                    CountdownBadge(
+                        remainingSeconds = remaining,
+                        totalSeconds = total,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 14.dp, end = 14.dp)
+                    )
+                }
                 Image(
                     painter = painterResource(R.drawable.logo),
                     contentDescription = null,
@@ -138,13 +169,7 @@ fun GateOverlay(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.CenterEnd
                 ) {
-                    Text(
-                        text = "SEREMIND",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.8.sp,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
-                    )
+
                 }
 
                 AppIcon(
@@ -189,7 +214,7 @@ fun GateOverlay(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "Masa Jeda Istirahat Aktif (Sisa $cooldownMinutesLeft menit)",
+                            text = "Masa Jeda Istirahat Aktif (Sisa ${formatCountdown(cooldownSeconds)})",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onErrorContainer,
@@ -309,7 +334,7 @@ fun GateOverlay(
 
                     if (countdownSeconds > 0) {
                         Text(
-                            text = "$countdownSeconds detik",
+                            text = "Jeda refleksi: ${formatCountdown(countdownSeconds)}",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.secondary

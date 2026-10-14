@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
         Article::class,
         UserPreference::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class SeremindDatabase : RoomDatabase() {
@@ -56,6 +56,7 @@ abstract class SeremindDatabase : RoomDatabase() {
                     .addMigrations(MIGRATION_1_2)
                     .addMigrations(MIGRATION_2_3)
                     .addMigrations(MIGRATION_3_4)
+                    .addMigrations(MIGRATION_4_5)
                     .fallbackToDestructiveMigration(false)
                     .addCallback(DatabaseCallback())
                     .build()
@@ -85,6 +86,34 @@ abstract class SeremindDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE app_targets_new (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            package_name TEXT NOT NULL,
+                            app_name TEXT NOT NULL,
+                            is_active INTEGER NOT NULL,
+                            delay_seconds INTEGER NOT NULL,
+                            max_session_minutes INTEGER NOT NULL DEFAULT 0,
+                            cooldown_minutes INTEGER NOT NULL DEFAULT 0,
+                            last_session_end_time INTEGER NOT NULL DEFAULT 0
+                        )
+                        """.trimIndent()
+                    )
+                    db.execSQL(
+                        """
+                        INSERT INTO app_targets_new
+                        SELECT id, package_name, app_name, is_active, delay_seconds,
+                            max_session_minutes, cooldown_minutes, last_session_end_time
+                        FROM app_targets
+                        """.trimIndent()
+                    )
+                    db.execSQL("DROP TABLE app_targets")
+                    db.execSQL("ALTER TABLE app_targets_new RENAME TO app_targets")
+                }
+            }
         private class DatabaseCallback : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)

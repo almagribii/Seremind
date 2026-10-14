@@ -89,7 +89,14 @@ class AppsViewModel(application: Application) : AndroidViewModel(application) {
                 val configuredDelay = SeremindDatabase.getDatabase(getApplication<Application>())
                     .userPreferenceDao().getPreference("default_delay")?.toIntOrNull()
                     ?.coerceIn(3, 30) ?: delaySeconds
-                val newTarget = AppTarget(packageName = packageName, appName = appName, isActive = true, delaySeconds = configuredDelay)
+                val newTarget = AppTarget(
+                    packageName = packageName,
+                    appName = appName,
+                    isActive = true,
+                    delaySeconds = configuredDelay,
+                    maxSessionMinutes = 0,
+                    cooldownMinutes = 0
+                )
                 appTargetDao.insert(newTarget)
                 loadTargets()
             }

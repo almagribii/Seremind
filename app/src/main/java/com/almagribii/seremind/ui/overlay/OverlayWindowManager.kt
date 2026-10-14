@@ -60,6 +60,10 @@ object OverlayWindowManager {
     var isOverlayVisible: Boolean = false
         private set
 
+    @Volatile
+    var isSessionTimerVisible: Boolean = false
+        private set
+
     private var windowManager: WindowManager? = null
     private var overlayView: ComposeView? = null
     private var lifecycleOwner: CustomLifecycleOwner? = null
@@ -73,6 +77,7 @@ object OverlayWindowManager {
         cooldownMinutes: Int = 30,
         isCooldownActive: Boolean = false,
         cooldownMinutesLeft: Int = 0,
+        cooldownRemainingSeconds: Int = cooldownMinutesLeft * 60,
         isWarningKick: Boolean = false,
         warningMessage: String? = null,
         onStartEmergencySession: (() -> Unit)? = null,
@@ -88,6 +93,7 @@ object OverlayWindowManager {
                 cooldownMinutes,
                 isCooldownActive,
                 cooldownMinutesLeft,
+                cooldownRemainingSeconds,
                 isWarningKick,
                 warningMessage,
                 onStartEmergencySession,
@@ -100,6 +106,12 @@ object OverlayWindowManager {
         runOnMain { dismissOverlayInternal(context) }
     }
 
+    fun showSessionTimer(context: Context, appName: String, durationMinutes: Int) {
+        runOnMain {
+            showSessionTimerInternal(context, appName, durationMinutes)
+        }
+    }
+
     @SuppressLint("InflateParams")
     private fun showOverlayInternal(
         context: Context,
@@ -110,6 +122,7 @@ object OverlayWindowManager {
         cooldownMinutes: Int = 30,
         isCooldownActive: Boolean = false,
         cooldownMinutesLeft: Int = 0,
+        cooldownRemainingSeconds: Int = cooldownMinutesLeft * 60,
         isWarningKick: Boolean = false,
         warningMessage: String? = null,
         onStartEmergencySession: (() -> Unit)? = null,
@@ -166,6 +179,7 @@ object OverlayWindowManager {
                         cooldownMinutes = cooldownMinutes,
                         isCooldownActive = isCooldownActive,
                         cooldownMinutesLeft = cooldownMinutesLeft,
+                        cooldownRemainingSeconds = cooldownRemainingSeconds,
                         isWarningKick = isWarningKick,
                         warningMessage = warningMessage,
                         onCancel = {
@@ -199,25 +213,80 @@ object OverlayWindowManager {
     }
 
     private fun dismissOverlayInternal(context: Context) {
-        val view = overlayView ?: return
-        val wm = windowManager
-            ?: context.applicationContext.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
-        if (wm != null) {
-            try {
-                wm.removeView(view)
-            } catch (_: IllegalArgumentException) {
-                // The view was already removed by the system.
+        val view = overlayView
+        if (view != null) {
+            val wm = windowManager
+                ?: context.applicationContext.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+            if (wm != null) {
+                try {
+                    wm.removeView(view)
+                } catch (_: IllegalArgumentException) {
+                    // The view was already removed by the system.
+                }
             }
         }
         overlayView = null
         windowManager = null
         isOverlayVisible = false
+        isSessionTimerVisible = false
         lifecycleOwner?.let {
             it.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
             it.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
             it.destroy()
         }
         lifecycleOwner = null
+    }
+
+    @SuppressLint("InflateParams")
+    private fun showSessionTimerInternal(
+        context: Context,
+        appName: String,
+        durationMinutes: Int
+    ) {
+        dismissOverlayInternal(context)
+
+        val appContext = context.applicationContext
+        val wm = appContext.getSystemService(Context.WINDOW_SERVICE) as? WindowManager ?: return
+        val owner = CustomLifecycleOwner()
+        val view = ComposeView(appContext)
+        view.setViewTreeLifecycleOwner(owner)
+        view.setViewTreeViewModelStoreOwner(owner)
+        view.setViewTreeSavedStateRegistryOwner(owner)
+
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            type,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply { gravity = Gravity.TOP or Gravity.START }
+
+        owner.handleLifecycleEvent(Lifecycle.Event.ON_START)
+        owner.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+        wm.addView(view, params)
+
+        windowManager = wm
+        overlayView = view
+        lifecycleOwner = owner
+        isOverlayVisible = false
+        isSessionTimerVisible = true
+        view.setContent {
+            SeremindTheme {
+                SessionTimerOverlay(
+                    appName = appName,
+                    durationSeconds = durationMinutes.coerceAtLeast(1) * 60
+                )
+            }
+        }
     }
 
     private fun runOnMain(action: () -> Unit) {
