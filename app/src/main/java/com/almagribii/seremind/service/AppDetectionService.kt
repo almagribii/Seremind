@@ -31,6 +31,9 @@ class AppDetectionService : Service() {
     private val serviceJob = Job()
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
     private var activeAppSession: String? = null
+    private var activeSessionStartTimestamp = 0L
+    private var activeSessionMaxMinutes = 15
+    private var isEmergencySession = false
     private var gateShownForSession = false
     private var launcherPackage: String? = null
     private var pendingBackgroundPackage: String? = null
@@ -136,11 +139,16 @@ class AppDetectionService : Service() {
                                     ) &&
                                 !OverlayWindowManager.isOverlayVisible
                             ) {
+                                val endedSessionPkg = activeAppSession
                                 activeAppSession = null
                                 gateShownForSession = false
+                                activeSessionStartTimestamp = 0L
                                 pendingBackgroundPackage = null
                                 pendingBackgroundSince = 0L
                                 pendingBackgroundEventTimestamp = 0L
+                                if (endedSessionPkg != null) {
+                                    appTargetDao.updateLastSessionEndTime(endedSessionPkg, System.currentTimeMillis())
+                                }
                                 Log.d(TAG, "Target app session ended: foreground changed to $observedPackage")
                             }
                         }
@@ -153,12 +161,10 @@ class AppDetectionService : Service() {
                             isWithinBlockingSchedule(preferenceDao.getPreference("blocking_schedule")) &&
                             !hasExceededDailyBudget(preferenceDao.getPreference("daily_budget"), foregroundApp)
                         ) {
-                            // A target app session owns one gate. Internal navigation
-                            // (for example, opening a profile or another page) keeps
-                            // the same package and therefore must not show it again.
                             if (foregroundApp != activeAppSession) {
                                 activeAppSession = foregroundApp
                                 gateShownForSession = false
+                                activeSessionStartTimestamp = 0L
                                 pendingBackgroundPackage = null
                                 pendingBackgroundSince = 0L
                                 pendingBackgroundEventTimestamp = 0L
@@ -181,14 +187,67 @@ class AppDetectionService : Service() {
                                         }.timeInMillis
                                     )
                                 )
+
+                                val timeSinceLastEnd = System.currentTimeMillis() - target.lastSessionEndTime
+                                val isCooldownActive = target.lastSessionEndTime > 0L && timeSinceLastEnd < (target.cooldownMinutes * 60_000L)
+                                val cooldownMinutesLeft = if (isCooldownActive) {
+                                    (((target.cooldownMinutes * 60_000L) - timeSinceLastEnd) / 60_000L + 1).toInt()
+                                } else 0
+
                                 OverlayWindowManager.showOverlay(
-                                    applicationContext,
-                                    target.packageName,
-                                    target.appName,
-                                    delaySeconds
+                                    context = applicationContext,
+                                    packageName = target.packageName,
+                                    appName = target.appName,
+                                    delaySeconds = delaySeconds,
+                                    maxSessionMinutes = target.maxSessionMinutes,
+                                    cooldownMinutes = target.cooldownMinutes,
+                                    isCooldownActive = isCooldownActive,
+                                    cooldownMinutesLeft = cooldownMinutesLeft,
+                                    onStartNormalSession = {
+                                        activeSessionStartTimestamp = System.currentTimeMillis()
+                                        activeSessionMaxMinutes = target.maxSessionMinutes
+                                        isEmergencySession = false
+                                    },
+                                    onStartEmergencySession = {
+                                        activeSessionStartTimestamp = System.currentTimeMillis()
+                                        activeSessionMaxMinutes = 5
+                                        isEmergencySession = true
+                                    }
                                 )
                             } else {
-                                Log.d(TAG, "Skipping overlay for $foregroundApp: gate already shown in this app session")
+                                if (activeSessionStartTimestamp > 0L) {
+                                    val elapsedMs = System.currentTimeMillis() - activeSessionStartTimestamp
+                                    val allowedMs = activeSessionMaxMinutes * 60_000L
+                                    if (elapsedMs >= allowedMs) {
+                                        Log.d(TAG, "Max session time limit reached ($activeSessionMaxMinutes mins). Kicking $foregroundApp to Home.")
+                                        appTargetDao.updateLastSessionEndTime(target.packageName, System.currentTimeMillis())
+
+                                        val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                                            addCategory(Intent.CATEGORY_HOME)
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        }
+                                        applicationContext.startActivity(homeIntent)
+
+                                        val warningMsg = if (isEmergencySession) {
+                                            "Batas waktu 5 menit darurat untuk ${target.appName} telah habis! Aplikasi ditutup otomatis untuk menjaga ketenanganmu."
+                                        } else {
+                                            "Batas waktu sesi $activeSessionMaxMinutes menit untuk ${target.appName} telah tercapai! Silakan beristirahat sejenak."
+                                        }
+
+                                        OverlayWindowManager.showOverlay(
+                                            context = applicationContext,
+                                            packageName = target.packageName,
+                                            appName = target.appName,
+                                            delaySeconds = 0,
+                                            isWarningKick = true,
+                                            warningMessage = warningMsg
+                                        )
+
+                                        activeAppSession = null
+                                        gateShownForSession = false
+                                        activeSessionStartTimestamp = 0L
+                                    }
+                                }
                             }
                         }
                     } else if (
@@ -199,11 +258,13 @@ class AppDetectionService : Service() {
                                     !isTransientForegroundPackage(foregroundApp)
                             )
                     ) {
-                        // Returning to the launcher ends the target-app session.
-                        // System UI remains transient so internal app transitions
-                        // do not trigger another gate.
+                        val endedPkg = activeAppSession
                         activeAppSession = null
                         gateShownForSession = false
+                        activeSessionStartTimestamp = 0L
+                        if (endedPkg != null) {
+                            appTargetDao.updateLastSessionEndTime(endedPkg, System.currentTimeMillis())
+                        }
                         Log.d(TAG, "Target app session ended: foreground app changed to $foregroundApp")
                     }
                 } catch (e: Exception) {

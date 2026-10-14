@@ -6,6 +6,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -132,7 +134,10 @@ fun AppsScreen(viewModel: AppsViewModel) {
         AppInteractionDialog(
             target = target,
             events = uiState.selectedEvents,
-            onDismiss = viewModel::closeTargetDetails
+            onDismiss = viewModel::closeTargetDetails,
+            onSaveSettings = { delaySec, maxMin, cooldownMin ->
+                viewModel.updateTargetSettings(target, delaySec, maxMin, cooldownMin)
+            }
         )
     }
     if (uiState.showDeleteConfirmation) {
@@ -194,9 +199,9 @@ private fun AppTargetRow(
             Column(Modifier.weight(1f).padding(start = 10.dp)) {
                 Text(target.appName, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Text(
-                    "Jeda: ${target.delaySeconds} detik",
+                    "Jeda: ${target.delaySeconds}s • Sesi: ${target.maxSessionMinutes}m • Istirahat: ${target.cooldownMinutes}m",
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = .68f),
-                    fontSize = 12.sp
+                    fontSize = 11.sp
                 )
             }
 
@@ -215,13 +220,19 @@ private fun AppTargetRow(
 
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AppInteractionDialog(
     target: AppTarget,
     events: List<GateEvent>,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onSaveSettings: (delaySeconds: Int, maxSessionMinutes: Int, cooldownMinutes: Int) -> Unit
 ) {
-    val format = remember { SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()) }
+    val format = remember { SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()) }
+    var selectedDelay by remember(target) { mutableIntStateOf(target.delaySeconds) }
+    var selectedMaxSession by remember(target) { mutableIntStateOf(target.maxSessionMinutes) }
+    var selectedCooldown by remember(target) { mutableIntStateOf(target.cooldownMinutes) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -232,25 +243,89 @@ private fun AppInteractionDialog(
             }
         },
         text = {
-            if (events.isEmpty()) {
-                Text("Belum ada interaksi tercatat untuk aplikasi ini.")
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Riwayat interaksi", fontWeight = FontWeight.Bold)
-                    events.take(20).forEach { event ->
-                        Column {
-                            Text(format.format(Date(event.timestamp)), fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text("Pengaturan Akses & Sesi", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+
+                // 1. Delay seconds
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Jeda sebelum membuka: $selectedDelay detik", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(3, 5, 10, 15, 30).forEach { sec ->
+                            FilterChip(
+                                selected = selectedDelay == sec,
+                                onClick = { selectedDelay = sec },
+                                label = { Text("${sec}s", fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                }
+
+                // 2. Max Session Minutes
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Batas waktu sesi aktif: $selectedMaxSession menit", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(5, 10, 15, 30, 60).forEach { min ->
+                            FilterChip(
+                                selected = selectedMaxSession == min,
+                                onClick = { selectedMaxSession = min },
+                                label = { Text("${min}m", fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                }
+
+                // 3. Cooldown Minutes
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Masa jeda istirahat wajib: $selectedCooldown menit", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(15, 30, 45, 60, 120).forEach { min ->
+                            FilterChip(
+                                selected = selectedCooldown == min,
+                                onClick = { selectedCooldown = min },
+                                label = { Text("${min}m", fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                }
+
+                HorizontalDivider()
+
+                Text("Riwayat Interaksi (${events.size})", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                if (events.isEmpty()) {
+                    Text("Belum ada interaksi tercatat.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                } else {
+                    events.take(10).forEach { event ->
+                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                            Text(format.format(Date(event.timestamp)), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                             Text(
-                                "${if (event.action == "cancelled") "Dicegah" else "Dibuka"} - ${event.reason}",
-                                fontSize = 13.sp
+                                text = "${if (event.action == "cancelled") "Dicegah" else "Dibuka"} (${event.reason})",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (event.action == "cancelled") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                             )
                         }
                     }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Tutup") } }
+        confirmButton = {
+            Button(
+                onClick = {
+                    onSaveSettings(selectedDelay, selectedMaxSession, selectedCooldown)
+                    onDismiss()
+                }
+            ) {
+                Text("Simpan Pengaturan")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Batal")
+            }
+        }
     )
 }
 

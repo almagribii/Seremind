@@ -10,5 +10,8 @@ data class AppTarget(
     @ColumnInfo(name = "package_name") val packageName: String,
     @ColumnInfo(name = "app_name") val appName: String,
     @ColumnInfo(name = "is_active") val isActive: Boolean = true,
-    @ColumnInfo(name = "delay_seconds") val delaySeconds: Int = 5
+    @ColumnInfo(name = "delay_seconds") val delaySeconds: Int = 5,
+    @ColumnInfo(name = "max_session_minutes") val maxSessionMinutes: Int = 15,
+    @ColumnInfo(name = "cooldown_minutes") val cooldownMinutes: Int = 30,
+    @ColumnInfo(name = "last_session_end_time") val lastSessionEndTime: Long = 0L
 )

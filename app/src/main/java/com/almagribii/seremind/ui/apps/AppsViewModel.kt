@@ -66,6 +66,21 @@ class AppsViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateTargetSettings(target: AppTarget, delaySeconds: Int, maxSessionMinutes: Int, cooldownMinutes: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val updated = target.copy(
+                delaySeconds = delaySeconds,
+                maxSessionMinutes = maxSessionMinutes,
+                cooldownMinutes = cooldownMinutes
+            )
+            appTargetDao.update(updated)
+            loadTargets()
+            if (_uiState.value.selectedTarget?.id == target.id) {
+                _uiState.value = _uiState.value.copy(selectedTarget = updated)
+            }
+        }
+    }
+
     fun addTarget(packageName: String, appName: String, delaySeconds: Int = 5) {
         viewModelScope.launch(Dispatchers.IO) {
             // Check if already exists

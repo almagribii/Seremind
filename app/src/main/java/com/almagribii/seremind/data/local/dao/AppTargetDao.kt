@@ -31,6 +31,12 @@ interface AppTargetDao {
     @Query("DELETE FROM app_targets WHERE package_name IN (:packageNames)")
     suspend fun deleteByPackages(packageNames: List<String>)
 
+    @Query("UPDATE app_targets SET last_session_end_time = :endTime WHERE package_name = :packageName")
+    suspend fun updateLastSessionEndTime(packageName: String, endTime: Long)
+
+    @Query("UPDATE app_targets SET delay_seconds = :delaySeconds, max_session_minutes = :maxSessionMinutes, cooldown_minutes = :cooldownMinutes WHERE package_name = :packageName")
+    suspend fun updateSessionSettings(packageName: String, delaySeconds: Int, maxSessionMinutes: Int, cooldownMinutes: Int)
+
     @Query("DELETE FROM app_targets")
     suspend fun deleteAll()
 }

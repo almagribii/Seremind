@@ -68,10 +68,31 @@ object OverlayWindowManager {
         context: Context,
         packageName: String,
         appName: String,
-        delaySeconds: Int
+        delaySeconds: Int,
+        maxSessionMinutes: Int = 15,
+        cooldownMinutes: Int = 30,
+        isCooldownActive: Boolean = false,
+        cooldownMinutesLeft: Int = 0,
+        isWarningKick: Boolean = false,
+        warningMessage: String? = null,
+        onStartEmergencySession: (() -> Unit)? = null,
+        onStartNormalSession: (() -> Unit)? = null
     ) {
         runOnMain {
-            showOverlayInternal(context, packageName, appName, delaySeconds)
+            showOverlayInternal(
+                context,
+                packageName,
+                appName,
+                delaySeconds,
+                maxSessionMinutes,
+                cooldownMinutes,
+                isCooldownActive,
+                cooldownMinutesLeft,
+                isWarningKick,
+                warningMessage,
+                onStartEmergencySession,
+                onStartNormalSession
+            )
         }
     }
 
@@ -84,7 +105,15 @@ object OverlayWindowManager {
         context: Context,
         packageName: String,
         appName: String,
-        delaySeconds: Int
+        delaySeconds: Int,
+        maxSessionMinutes: Int = 15,
+        cooldownMinutes: Int = 30,
+        isCooldownActive: Boolean = false,
+        cooldownMinutesLeft: Int = 0,
+        isWarningKick: Boolean = false,
+        warningMessage: String? = null,
+        onStartEmergencySession: (() -> Unit)? = null,
+        onStartNormalSession: (() -> Unit)? = null
     ) {
         dismissOverlayInternal(context)
 
@@ -133,6 +162,12 @@ object OverlayWindowManager {
                         packageName = packageName,
                         appName = appName,
                         delaySeconds = delaySeconds,
+                        maxSessionMinutes = maxSessionMinutes,
+                        cooldownMinutes = cooldownMinutes,
+                        isCooldownActive = isCooldownActive,
+                        cooldownMinutesLeft = cooldownMinutesLeft,
+                        isWarningKick = isWarningKick,
+                        warningMessage = warningMessage,
                         onCancel = {
                             dismissOverlay(appContext)
                             val homeIntent = Intent(Intent.ACTION_MAIN).apply {
@@ -141,7 +176,14 @@ object OverlayWindowManager {
                             }
                             appContext.startActivity(homeIntent)
                         },
-                        onOpenAllowed = { dismissOverlay(appContext) },
+                        onOpenAllowed = {
+                            dismissOverlay(appContext)
+                            onStartNormalSession?.invoke()
+                        },
+                        onEmergencyOpenAllowed = {
+                            dismissOverlay(appContext)
+                            onStartEmergencySession?.invoke()
+                        },
                         onWriteReflection = { prompt ->
                             dismissOverlay(appContext)
                             val intent = Intent(appContext, MainActivity::class.java).apply {
