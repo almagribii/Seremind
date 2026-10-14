@@ -57,16 +57,28 @@ val localProperties = Properties().apply {
         localPropertiesFile.inputStream().use(::load)
     }
 }
-val overlayGeminiApiKey = localProperties.getProperty("GEMINI_API_KEY_OVERLAY", "")
+val generalGeminiApiKey = localProperties.getProperty("GEMINI_API_KEY", "")
+    .ifEmpty { localProperties.getProperty("GEMINI_API_KEY_STATISTICS", "") }
+    .ifEmpty { localProperties.getProperty("GEMINI_API_KEY_STATISTIK", "") }
+    .ifEmpty { localProperties.getProperty("GEMINI_API_KEY_JURNAL", "") }
+    .ifEmpty { localProperties.getProperty("GEMINI_API_KEY_OVERLAY", "") }
     .replace("\\", "\\\\")
     .replace("\"", "\\\"")
+
+val overlayGeminiApiKey = localProperties.getProperty("GEMINI_API_KEY_OVERLAY", "")
+    .ifEmpty { generalGeminiApiKey }
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
+
 val journalGeminiApiKey = localProperties.getProperty("GEMINI_API_KEY_JURNAL", "")
+    .ifEmpty { generalGeminiApiKey }
     .replace("\\", "\\\\")
     .replace("\"", "\\\"")
 
 android.defaultConfig {
     buildConfigField("String", "GEMINI_API_KEY_OVERLAY", "\"$overlayGeminiApiKey\"")
     buildConfigField("String", "GEMINI_API_KEY_JURNAL", "\"$journalGeminiApiKey\"")
+    buildConfigField("String", "GEMINI_API_KEY", "\"$generalGeminiApiKey\"")
 }
 
 dependencies {

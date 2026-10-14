@@ -17,6 +17,7 @@ import org.json.JSONObject
 
 class GeminiApiService(private val apiKey: String = "") {
     data class JournalFeedbackResult(val feedback: String? = null, val error: String? = null)
+    data class StatisticsAnalogyResult(val analogy: String? = null, val feedback: String? = null, val error: String? = null)
     private data class TextResponse(val text: String? = null, val error: String? = null)
 
     private val client = OkHttpClient.Builder()
@@ -247,6 +248,106 @@ class GeminiApiService(private val apiKey: String = "") {
             "Kamu sedang menuju $appName; sadari hal yang ingin kamu dapatkan dari pilihan ini."
         )
         return statements.random()
+    }
+
+    suspend fun generateStatisticsAnalogy(
+        period: String,
+        totalOpened: Int,
+        totalCancelled: Int,
+        peakHoursSummary: String,
+        reasonsSummary: String,
+        appsSummary: String,
+        sequencesSummary: String
+    ): StatisticsAnalogyResult = withContext(Dispatchers.IO) {
+        if (apiKey.isBlank()) {
+            return@withContext getStaticStatisticsAnalogy(
+                period = period,
+                peakHoursSummary = peakHoursSummary,
+                reasonsSummary = reasonsSummary,
+                appsSummary = appsSummary
+            )
+        }
+        try {
+            withTimeout(15_000) {
+                val prompt = """
+                    Analisis data agregat penggunaan aplikasi pengguna selama periode $period berikut:
+                    - Total dibuka: $totalOpened, Total dicegah/dibatalkan: $totalCancelled
+                    - Puncak jam pembukaan: $peakHoursSummary
+                    - Alasan terbanyak: $reasonsSummary
+                    - Aplikasi terbanyak: $appsSummary
+                    - Urutan/pola transisi pembukaan antar aplikasi: $sequencesSummary
+
+                    Tugasmu:
+                    1) Temukan 1 korelasi/pola hubungan tersembunyi antar aplikasi atau antar waktu/alasan yang mungkin tidak disadari pengguna (misal: membuka aplikasi A di jam tertentu yang biasanya diikuti dengan membuka aplikasi B, atau korelasi antar aplikasi/alasan). Sajikan pola korelasi ini dalam 1-2 kalimat yang empatik, ramah, dan tajam (tanpa menghakimi).
+                    2) Berikan 1 saran/feedback konkret yang realistis dan dapat dilakukan pengguna ke depan untuk meningkatkan kesadaran digital dan memperkecil gesekan ini.
+
+                    Kembalikan HANYA JSON valid dengan format persis berikut (tanpa blok markdown atau teks lain):
+                    {"analogy": "isi korelasi pola 1-2 kalimat", "feedback": "saran/feedback konkret ke depan"}
+                """.trimIndent()
+
+                val responseText = requestStatsText(prompt)
+                if (responseText != null) {
+                    val cleanJson = responseText.replace("```json", "").replace("```", "").trim()
+                    val jsonObject = JSONObject(cleanJson)
+                    val analogy = jsonObject.optString("analogy").trim()
+                    val feedback = jsonObject.optString("feedback").trim()
+                    if (analogy.isNotBlank() && feedback.isNotBlank()) {
+                        return@withTimeout StatisticsAnalogyResult(
+                            analogy = analogy,
+                            feedback = feedback
+                        )
+                    }
+                }
+                getStaticStatisticsAnalogy(period, peakHoursSummary, reasonsSummary, appsSummary)
+            }
+        } catch (e: Exception) {
+            getStaticStatisticsAnalogy(period, peakHoursSummary, reasonsSummary, appsSummary)
+        }
+    }
+
+    private fun requestStatsText(prompt: String): String? {
+        if (apiKey.isBlank()) return null
+        return try {
+            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey"
+            val body = JSONObject().apply {
+                put("contents", JSONArray().put(JSONObject().apply {
+                    put("parts", JSONArray().put(JSONObject().put("text", prompt)))
+                }))
+            }
+            val request = Request.Builder()
+                .url(url)
+                .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+            journalClient.newCall(request).execute().use { response ->
+                val rawBody = response.body?.string().orEmpty()
+                if (!response.isSuccessful) return@use null
+                JSONObject(rawBody)
+                    .optJSONArray("candidates")?.takeIf { it.length() > 0 }
+                    ?.getJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts")
+                    ?.takeIf { it.length() > 0 }?.getJSONObject(0)?.optString("text")
+                    ?.trim()?.takeIf { it.isNotBlank() }
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun getStaticStatisticsAnalogy(
+        period: String,
+        peakHoursSummary: String,
+        reasonsSummary: String,
+        appsSummary: String
+    ): StatisticsAnalogyResult {
+        val app = appsSummary.split(",").firstOrNull()?.takeBefore("(")?.trim()?.ifBlank { null } ?: "aplikasi target"
+        val reason = reasonsSummary.split(",").firstOrNull()?.takeBefore("(")?.trim()?.ifBlank { null } ?: "alasan tertentu"
+        val analogy = "Kamu cenderung paling sering mengakses $app di jam-jam rawan ($peakHoursSummary), dan biasanya terdorong oleh $reason. Kedua hal ini tampak saling memicu kebiasaan membuka layar secara otomatis."
+        val feedback = "Coba atur durasi jeda yang lebih panjang pada $app dan alihkan perhatian dengan latihan napas singkat atau menulis jurnal saat merasa $reason."
+        return StatisticsAnalogyResult(analogy = analogy, feedback = feedback)
+    }
+
+    private fun String.takeBefore(delimiter: String): String {
+        val index = indexOf(delimiter)
+        return if (index != -1) substring(0, index) else this
     }
 
     private fun getStaticRecoveryResponse(emotion: String): String {
