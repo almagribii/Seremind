@@ -3,6 +3,7 @@ package com.almagribii.seremind.ui.overlay
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -58,7 +60,10 @@ fun GateOverlay(
     var customReason by remember { mutableStateOf("") }
     var countdownSeconds by remember { mutableStateOf(delaySeconds) }
     var isOpenedEnabled by remember { mutableStateOf(false) }
-    var cooldownSeconds by remember { mutableStateOf(cooldownRemainingSeconds) }
+    var cooldownSeconds by remember { mutableIntStateOf(cooldownRemainingSeconds) }
+    var isCooldownFinished by remember { mutableStateOf(false) }
+
+    val effectiveCooldownActive = isCooldownActive && !isCooldownFinished && cooldownSeconds > 0
 
     val reasons = listOf("Hiburan", "Bosan", "Cek Notifikasi", "Refleks Aja", "Cari Informasi", "Lainnya")
 
@@ -90,13 +95,16 @@ fun GateOverlay(
         if (isCooldownActive) {
             var remaining = cooldownRemainingSeconds
             cooldownSeconds = remaining
+            isCooldownFinished = false
             while (remaining > 0) {
                 delay(1000)
                 remaining--
                 cooldownSeconds = remaining
             }
+            isCooldownFinished = true
+        } else {
+            isCooldownFinished = false
         }
-
     }
 
     val recordAndExecute: (action: String, onSuccess: () -> Unit) -> Unit = { action, onSuccess ->
@@ -126,7 +134,10 @@ fun GateOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.85f))
+            .background(Color.Black.copy(alpha = 0.90f))
+            .pointerInput(Unit) {
+                detectTapGestures { }
+            }
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -136,9 +147,9 @@ fun GateOverlay(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Box {
-                if (!isWarningKick && (isCooldownActive || countdownSeconds > 0)) {
-                    val remaining = if (isCooldownActive) cooldownSeconds else countdownSeconds
-                    val total = if (isCooldownActive) {
+                if (!isWarningKick && (effectiveCooldownActive || countdownSeconds > 0)) {
+                    val remaining = if (effectiveCooldownActive) cooldownSeconds else countdownSeconds
+                    val total = if (effectiveCooldownActive) {
                         cooldownRemainingSeconds.coerceAtLeast(1)
                     } else {
                         delaySeconds.coerceAtLeast(1)
@@ -207,7 +218,7 @@ fun GateOverlay(
                     ) {
                         Text("Mengerti", fontWeight = FontWeight.Bold)
                     }
-                } else if (isCooldownActive) {
+                } else if (effectiveCooldownActive) {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.errorContainer,
@@ -382,15 +393,7 @@ fun GateOverlay(
                         }
                     }
 
-                    TextButton(
-                        onClick = {
-                            recordAndExecute("cancelled") {
-                                onWriteReflection(statement)
-                            }
-                        }
-                    ) {
-                        Text("Tulis Jurnal Refleksi", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                    }
+
                 }
             }
             }

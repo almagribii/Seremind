@@ -21,21 +21,90 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.Calendar
 
+private data class ActiveSessionInfo(
+    val packageName: String,
+    val appName: String,
+    val totalMinutes: Int,
+    var remainingSeconds: Int,
+    val isEmergency: Boolean = false,
+    var lastActiveTimestampMs: Long = System.currentTimeMillis()
+)
+
 class AppDetectionService : Service() {
 
     private val serviceJob = Job()
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
-    private var activeAppSession: String? = null
-    private var activeSessionStartTimestamp = 0L
-    private var activeSessionMaxMinutes = 15
-    private var isEmergencySession = false
+    private var sessionExpirationJob: Job? = null
+    private val activeSessions = mutableMapOf<String, ActiveSessionInfo>()
     private var gateShownForSession = false
+    private var currentObservedForegroundApp: String? = null
+    private var expiredKickedPackage: String? = null
     private var launcherPackage: String? = null
+
+    private fun triggerSessionExpired(
+        targetPackageName: String,
+        appName: String,
+        activeSessionTotalMinutes: Int,
+        isEmergencySession: Boolean
+    ) {
+        activeSessions.remove(targetPackageName)
+        sessionExpirationJob?.cancel()
+        serviceScope.launch(Dispatchers.Main) {
+            val now = System.currentTimeMillis()
+            val database = SeremindDatabase.getDatabase(applicationContext)
+            val appTargetDao = database.appTargetDao()
+
+            OverlayWindowManager.dismissOverlay(applicationContext)
+            Log.d(TAG, "Max session time limit reached instantly. Kicking $targetPackageName to Home.")
+
+            withContext(Dispatchers.IO) {
+                appTargetDao.updateLastSessionEndTime(targetPackageName, now)
+            }
+
+            val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+            }
+            applicationContext.startActivity(homeIntent)
+
+            val warningMsg = if (isEmergencySession) {
+                "Batas waktu 5 menit darurat untuk $appName telah habis! Aplikasi ditutup otomatis untuk menjaga ketenanganmu."
+            } else {
+                "Batas waktu sesi $activeSessionTotalMinutes menit untuk $appName telah tercapai! Silakan beristirahat sejenak."
+            }
+
+            val target = withContext(Dispatchers.IO) {
+                appTargetDao.getTargetByPackage(targetPackageName)
+            }
+            val cooldownMinutes = target?.cooldownMinutes ?: 30
+            val isCooldownActive = cooldownMinutes > 0
+            val cooldownMinutesLeft = cooldownMinutes
+            val cooldownRemainingSeconds = cooldownMinutes * 60
+
+            OverlayWindowManager.showOverlay(
+                context = applicationContext,
+                packageName = targetPackageName,
+                appName = appName,
+                delaySeconds = 0,
+                maxSessionMinutes = activeSessionTotalMinutes,
+                cooldownMinutes = cooldownMinutes,
+                isCooldownActive = isCooldownActive,
+                cooldownMinutesLeft = cooldownMinutesLeft,
+                cooldownRemainingSeconds = cooldownRemainingSeconds,
+                isWarningKick = true,
+                warningMessage = warningMsg
+            )
+
+            expiredKickedPackage = targetPackageName
+            gateShownForSession = true
+        }
+    }
     private var pendingBackgroundPackage: String? = null
     private var pendingBackgroundSince = 0L
     private var pendingBackgroundEventTimestamp = 0L
@@ -121,39 +190,36 @@ class AppDetectionService : Service() {
                 try {
                     val lifecycleState = UsageStatsHelper.getLatestAppLifecycleState(applicationContext)
                     val foregroundApp = lifecycleState?.takeIf { it.isForeground }?.packageName
+                    val now = System.currentTimeMillis()
                     Log.d(TAG, "Polled foreground app: $foregroundApp (self package: $packageName)")
 
-                    lifecycleState?.foregroundEvents
-                        ?.filter { (_, timestamp) ->
-                            timestamp > lastProcessedForegroundEventTimestamp
+                    if (foregroundApp != currentObservedForegroundApp) {
+                        currentObservedForegroundApp = foregroundApp
+                        if (foregroundApp != expiredKickedPackage) {
+                            gateShownForSession = false
                         }
-                        ?.sortedBy { (_, timestamp) -> timestamp }
-                        ?.forEach { (observedPackage, timestamp) ->
-                            lastProcessedForegroundEventTimestamp = timestamp
-                            if (
-                                activeAppSession != null &&
-                                observedPackage != activeAppSession &&
-                                (
-                                    observedPackage == packageName ||
-                                    observedPackage == launcherPackage ||
-                                            !isTransientForegroundPackage(observedPackage)
-                                    ) &&
-                                !OverlayWindowManager.isOverlayVisible
-                            ) {
-                                val endedSessionPkg = activeAppSession
-                                activeAppSession = null
-                                gateShownForSession = false
-                                activeSessionStartTimestamp = 0L
-                                pendingBackgroundPackage = null
-                                pendingBackgroundSince = 0L
-                                pendingBackgroundEventTimestamp = 0L
-                                if (endedSessionPkg != null) {
-                                    appTargetDao.updateLastSessionEndTime(endedSessionPkg, System.currentTimeMillis())
-                                }
+                    }
+
+                    if (foregroundApp != expiredKickedPackage && expiredKickedPackage != null) {
+                        expiredKickedPackage = null
+                        gateShownForSession = false
+                    }
+
+                    // Freeze lastActiveTimestampMs for all inactive sessions (paused in background)
+                    activeSessions.values.forEach { session ->
+                        if (session.packageName != foregroundApp) {
+                            session.lastActiveTimestampMs = now
+                        }
+                    }
+
+                    // Dismiss timer if user switched to Launcher or a non-target app without active session
+                    if (foregroundApp != null && !activeSessions.containsKey(foregroundApp)) {
+                        if (foregroundApp == launcherPackage || !isTransientForegroundPackage(foregroundApp)) {
+                            if (OverlayWindowManager.isSessionTimerVisible) {
                                 OverlayWindowManager.dismissOverlay(applicationContext)
-                                Log.d(TAG, "Target app session ended: foreground changed to $observedPackage")
                             }
                         }
+                    }
 
                     if (foregroundApp != null && foregroundApp != packageName) {
                         val target = appTargetDao.getTargetByPackage(foregroundApp)
@@ -163,119 +229,171 @@ class AppDetectionService : Service() {
                             isWithinBlockingSchedule(preferenceDao.getPreference("blocking_schedule")) &&
                             !hasExceededDailyBudget(preferenceDao.getPreference("daily_budget"), foregroundApp)
                         ) {
-                            if (foregroundApp != activeAppSession) {
-                                activeAppSession = foregroundApp
-                                gateShownForSession = false
-                                activeSessionStartTimestamp = 0L
-                                pendingBackgroundPackage = null
-                                pendingBackgroundSince = 0L
-                                pendingBackgroundEventTimestamp = 0L
-                            }
+                            val activeSession = activeSessions[foregroundApp]
 
-                            if (!gateShownForSession) {
-                                Log.d(TAG, "Triggering overlay for target app: ${target.appName} (${target.packageName}) with delay ${target.delaySeconds}s")
-                                gateShownForSession = true
-                                val delaySeconds = calculateDelaySeconds(
-                                    target.delaySeconds,
-                                    preferenceDao.getPreference("focus_mode") == "true",
-                                    preferenceDao.getPreference("escalation_friction") != "false",
-                                    gateEventDao.getCancelledCountForPackage(
-                                        target.packageName,
-                                        java.util.Calendar.getInstance().apply {
-                                            set(java.util.Calendar.HOUR_OF_DAY, 0)
-                                            set(java.util.Calendar.MINUTE, 0)
-                                            set(java.util.Calendar.SECOND, 0)
-                                            set(java.util.Calendar.MILLISECOND, 0)
-                                        }.timeInMillis
-                                    )
-                                )
+                            // Scenario A: An active session exists for this target app!
+                            if (activeSession != null) {
+                                val elapsedSec = ((now - activeSession.lastActiveTimestampMs) / 1000L).toInt()
+                                if (elapsedSec > 0) {
+                                    activeSession.remainingSeconds = (activeSession.remainingSeconds - elapsedSec).coerceAtLeast(0)
+                                    activeSession.lastActiveTimestampMs = now
+                                }
 
-                                val timeSinceLastEnd = System.currentTimeMillis() - target.lastSessionEndTime
-                                val isCooldownActive = target.cooldownMinutes > 0 &&
-                                        target.lastSessionEndTime > 0L &&
-                                        timeSinceLastEnd < (target.cooldownMinutes * 60_000L)
-                                val cooldownMinutesLeft = if (isCooldownActive) {
-                                    (((target.cooldownMinutes * 60_000L) - timeSinceLastEnd) / 60_000L + 1).toInt()
-                                } else 0
-                                val cooldownRemainingSeconds = if (isCooldownActive) {
-                                    (((target.cooldownMinutes * 60_000L) - timeSinceLastEnd) / 1_000L)
-                                        .coerceAtLeast(0L)
-                                        .toInt()
-                                } else 0
-
-                                OverlayWindowManager.showOverlay(
-                                    context = applicationContext,
-                                    packageName = target.packageName,
-                                    appName = target.appName,
-                                    delaySeconds = delaySeconds,
-                                    maxSessionMinutes = target.maxSessionMinutes,
-                                    cooldownMinutes = target.cooldownMinutes,
-                                    isCooldownActive = isCooldownActive,
-                                    cooldownMinutesLeft = cooldownMinutesLeft,
-                                    cooldownRemainingSeconds = cooldownRemainingSeconds,
-                                    onStartNormalSession = {
-                                        activeSessionStartTimestamp = System.currentTimeMillis()
-                                        activeSessionMaxMinutes = target.maxSessionMinutes
-                                        isEmergencySession = false
-                                        if (target.maxSessionMinutes > 0) {
-                                            OverlayWindowManager.showSessionTimer(
-                                                applicationContext,
-                                                target.appName,
-                                                target.maxSessionMinutes
-                                            )
-                                        }
-                                    },
-                                    onStartEmergencySession = {
-                                        activeSessionStartTimestamp = System.currentTimeMillis()
-                                        activeSessionMaxMinutes = 5
-                                        isEmergencySession = true
+                                if (activeSession.remainingSeconds > 0) {
+                                    gateShownForSession = true
+                                    if (!OverlayWindowManager.isSessionTimerVisible && !OverlayWindowManager.isOverlayVisible) {
                                         OverlayWindowManager.showSessionTimer(
-                                            applicationContext,
-                                            target.appName,
-                                            5
+                                            context = applicationContext,
+                                            appName = activeSession.appName,
+                                            remainingSeconds = activeSession.remainingSeconds,
+                                            totalSeconds = activeSession.totalMinutes * 60,
+                                            onTick = { currentSec ->
+                                                activeSession.remainingSeconds = currentSec
+                                            },
+                                            onTimerExpired = {
+                                                triggerSessionExpired(
+                                                    activeSession.packageName,
+                                                    activeSession.appName,
+                                                    activeSession.totalMinutes,
+                                                    activeSession.isEmergency
+                                                )
+                                            }
                                         )
                                     }
-                                )
-                            } else {
-                                if (activeSessionStartTimestamp > 0L) {
-                                    val elapsedMs = System.currentTimeMillis() - activeSessionStartTimestamp
-                                    val allowedMs = activeSessionMaxMinutes * 60_000L
-                                    if (activeSessionMaxMinutes > 0 && elapsedMs >= allowedMs) {
-                                        OverlayWindowManager.dismissOverlay(applicationContext)
-                                        Log.d(TAG, "Max session time limit reached ($activeSessionMaxMinutes mins). Kicking $foregroundApp to Home.")
-                                        appTargetDao.updateLastSessionEndTime(target.packageName, System.currentTimeMillis())
+                                } else {
+                                    // Session time expired!
+                                    triggerSessionExpired(
+                                        activeSession.packageName,
+                                        activeSession.appName,
+                                        activeSession.totalMinutes,
+                                        activeSession.isEmergency
+                                    )
+                                }
+                            }
+                            // Scenario B: Opening target app without an active running session
+                            else {
+                                if (foregroundApp != expiredKickedPackage && !gateShownForSession) {
+                                    Log.d(TAG, "Triggering overlay for target app: ${target.appName} (${target.packageName}) with delay ${target.delaySeconds}s")
+                                    gateShownForSession = true
+                                    val delaySeconds = calculateDelaySeconds(
+                                        target.delaySeconds,
+                                        preferenceDao.getPreference("focus_mode") == "true",
+                                        preferenceDao.getPreference("escalation_friction") != "false",
+                                        gateEventDao.getCancelledCountForPackage(
+                                            target.packageName,
+                                            java.util.Calendar.getInstance().apply {
+                                                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                                                set(java.util.Calendar.MINUTE, 0)
+                                                set(java.util.Calendar.SECOND, 0)
+                                                set(java.util.Calendar.MILLISECOND, 0)
+                                            }.timeInMillis
+                                        )
+                                    )
 
-                                        val homeIntent = Intent(Intent.ACTION_MAIN).apply {
-                                            addCategory(Intent.CATEGORY_HOME)
-                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    val timeSinceLastEnd = now - target.lastSessionEndTime
+                                    val isCooldownActive = target.cooldownMinutes > 0 &&
+                                            target.lastSessionEndTime > 0L &&
+                                            timeSinceLastEnd < (target.cooldownMinutes * 60_000L)
+                                    val cooldownMinutesLeft = if (isCooldownActive) {
+                                        (((target.cooldownMinutes * 60_000L) - timeSinceLastEnd) / 60_000L + 1).toInt()
+                                    } else 0
+                                    val cooldownRemainingSeconds = if (isCooldownActive) {
+                                        (((target.cooldownMinutes * 60_000L) - timeSinceLastEnd) / 1_000L)
+                                            .coerceAtLeast(0L)
+                                            .toInt()
+                                    } else 0
+
+                                    OverlayWindowManager.showOverlay(
+                                        context = applicationContext,
+                                        packageName = target.packageName,
+                                        appName = target.appName,
+                                        delaySeconds = delaySeconds,
+                                        maxSessionMinutes = target.maxSessionMinutes,
+                                        cooldownMinutes = target.cooldownMinutes,
+                                        isCooldownActive = isCooldownActive,
+                                        cooldownMinutesLeft = cooldownMinutesLeft,
+                                        cooldownRemainingSeconds = cooldownRemainingSeconds,
+                                        onStartNormalSession = {
+                                            val session = ActiveSessionInfo(
+                                                packageName = target.packageName,
+                                                appName = target.appName,
+                                                totalMinutes = target.maxSessionMinutes,
+                                                remainingSeconds = target.maxSessionMinutes * 60,
+                                                isEmergency = false,
+                                                lastActiveTimestampMs = System.currentTimeMillis()
+                                            )
+                                            activeSessions[target.packageName] = session
+                                            val durationMs = target.maxSessionMinutes * 60_000L
+                                            sessionExpirationJob?.cancel()
+                                            sessionExpirationJob = serviceScope.launch {
+                                                delay(durationMs)
+                                                triggerSessionExpired(target.packageName, target.appName, target.maxSessionMinutes, false)
+                                            }
+                                            if (target.maxSessionMinutes > 0) {
+                                                OverlayWindowManager.showSessionTimer(
+                                                    context = applicationContext,
+                                                    appName = target.appName,
+                                                    remainingSeconds = target.maxSessionMinutes * 60,
+                                                    totalSeconds = target.maxSessionMinutes * 60,
+                                                    onTick = { currentSec ->
+                                                        activeSessions[target.packageName]?.remainingSeconds = currentSec
+                                                    },
+                                                    onTimerExpired = {
+                                                        triggerSessionExpired(
+                                                            target.packageName,
+                                                            target.appName,
+                                                            target.maxSessionMinutes,
+                                                            false
+                                                        )
+                                                    }
+                                                )
+                                            }
+                                        },
+                                        onStartEmergencySession = {
+                                            val session = ActiveSessionInfo(
+                                                packageName = target.packageName,
+                                                appName = target.appName,
+                                                totalMinutes = 5,
+                                                remainingSeconds = 5 * 60,
+                                                isEmergency = true,
+                                                lastActiveTimestampMs = System.currentTimeMillis()
+                                            )
+                                            activeSessions[target.packageName] = session
+                                            val durationMs = 5 * 60_000L
+                                            sessionExpirationJob?.cancel()
+                                            sessionExpirationJob = serviceScope.launch {
+                                                delay(durationMs)
+                                                triggerSessionExpired(target.packageName, target.appName, 5, true)
+                                            }
+                                            OverlayWindowManager.showSessionTimer(
+                                                context = applicationContext,
+                                                appName = target.appName,
+                                                remainingSeconds = 5 * 60,
+                                                totalSeconds = 5 * 60,
+                                                onTick = { currentSec ->
+                                                    activeSessions[target.packageName]?.remainingSeconds = currentSec
+                                                },
+                                                onTimerExpired = {
+                                                    triggerSessionExpired(
+                                                        target.packageName,
+                                                        target.appName,
+                                                        5,
+                                                        true
+                                                    )
+                                                }
+                                            )
                                         }
-                                        applicationContext.startActivity(homeIntent)
-
-                                        activeAppSession = null
-                                        gateShownForSession = false
-                                        activeSessionStartTimestamp = 0L
-                                    }
+                                    )
                                 }
                             }
                         }
                     } else if (
                         foregroundApp != null &&
-                        activeAppSession != null &&
-                        (
-                            foregroundApp == packageName ||
-                            foregroundApp == launcherPackage ||
-                                    !isTransientForegroundPackage(foregroundApp)
-                            )
+                        foregroundApp == launcherPackage
                     ) {
-                        val endedPkg = activeAppSession
-                        activeAppSession = null
-                        gateShownForSession = false
-                        activeSessionStartTimestamp = 0L
-                        if (endedPkg != null) {
-                            appTargetDao.updateLastSessionEndTime(endedPkg, System.currentTimeMillis())
+                        if (OverlayWindowManager.isSessionTimerVisible) {
+                            OverlayWindowManager.dismissOverlay(applicationContext)
                         }
-                        OverlayWindowManager.dismissOverlay(applicationContext)
-                        Log.d(TAG, "Target app session ended: foreground app changed to $foregroundApp")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error in app monitoring loop", e)
@@ -348,9 +466,7 @@ class AppDetectionService : Service() {
         escalationFriction: Boolean,
         cancelledToday: Int
     ): Int {
-        val focusDelay = if (focusMode) maxOf(baseDelay, 10) else baseDelay
-        val escalationDelay = if (escalationFriction) cancelledToday.coerceAtMost(5) else 0
-        return (focusDelay + escalationDelay).coerceIn(3, 30)
+        return baseDelay.coerceIn(3, 30)
     }
 
     private fun updateServiceNotification(reflectionEnabled: Boolean) {

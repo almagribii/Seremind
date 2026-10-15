@@ -67,6 +67,7 @@ object OverlayWindowManager {
     private var windowManager: WindowManager? = null
     private var overlayView: ComposeView? = null
     private var lifecycleOwner: CustomLifecycleOwner? = null
+    private var timerParams: WindowManager.LayoutParams? = null
 
     fun showOverlay(
         context: Context,
@@ -106,9 +107,16 @@ object OverlayWindowManager {
         runOnMain { dismissOverlayInternal(context) }
     }
 
-    fun showSessionTimer(context: Context, appName: String, durationMinutes: Int) {
+    fun showSessionTimer(
+        context: Context,
+        appName: String,
+        remainingSeconds: Int,
+        totalSeconds: Int,
+        onTick: ((Int) -> Unit)? = null,
+        onTimerExpired: (() -> Unit)? = null
+    ) {
         runOnMain {
-            showSessionTimerInternal(context, appName, durationMinutes)
+            showSessionTimerInternal(context, appName, remainingSeconds, totalSeconds, onTick, onTimerExpired)
         }
     }
 
@@ -152,8 +160,7 @@ object OverlayWindowManager {
             WindowManager.LayoutParams.MATCH_PARENT,
             type,
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                    WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR,
             PixelFormat.TRANSLUCENT
         ).apply { gravity = Gravity.CENTER }
 
@@ -237,11 +244,28 @@ object OverlayWindowManager {
         lifecycleOwner = null
     }
 
+    fun updateTimerPosition(deltaX: Float, deltaY: Float) {
+        runOnMain {
+            val p = timerParams ?: return@runOnMain
+            val v = overlayView ?: return@runOnMain
+            val wm = windowManager ?: return@runOnMain
+            p.x = (p.x - deltaX.toInt()).coerceAtLeast(0)
+            p.y = (p.y + deltaY.toInt()).coerceAtLeast(0)
+            try {
+                wm.updateViewLayout(v, p)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     @SuppressLint("InflateParams")
     private fun showSessionTimerInternal(
         context: Context,
         appName: String,
-        durationMinutes: Int
+        remainingSeconds: Int,
+        totalSeconds: Int,
+        onTick: ((Int) -> Unit)? = null,
+        onTimerExpired: (() -> Unit)? = null
     ) {
         dismissOverlayInternal(context)
 
@@ -259,16 +283,20 @@ object OverlayWindowManager {
             @Suppress("DEPRECATION")
             WindowManager.LayoutParams.TYPE_PHONE
         }
+        val density = appContext.resources.displayMetrics.density
         val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
             type,
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
-        ).apply { gravity = Gravity.TOP or Gravity.START }
+        ).apply {
+            gravity = Gravity.TOP or Gravity.END
+            x = (16 * density).toInt()
+            y = (60 * density).toInt()
+        }
 
         owner.handleLifecycleEvent(Lifecycle.Event.ON_START)
         owner.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
@@ -277,13 +305,19 @@ object OverlayWindowManager {
         windowManager = wm
         overlayView = view
         lifecycleOwner = owner
+        timerParams = params
         isOverlayVisible = false
         isSessionTimerVisible = true
         view.setContent {
             SeremindTheme {
                 SessionTimerOverlay(
                     appName = appName,
-                    durationSeconds = durationMinutes.coerceAtLeast(1) * 60
+                    remainingSeconds = remainingSeconds,
+                    totalSeconds = totalSeconds,
+                    onDrag = { dx, dy -> updateTimerPosition(dx, dy) },
+                    onDismiss = { dismissOverlay(appContext) },
+                    onTick = { sec -> onTick?.invoke(sec) },
+                    onTimerExpired = { onTimerExpired?.invoke() }
                 )
             }
         }

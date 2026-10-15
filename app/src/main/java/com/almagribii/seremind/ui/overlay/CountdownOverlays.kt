@@ -8,6 +8,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,18 +17,28 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DragIndicator
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -93,46 +104,98 @@ fun formatCountdown(seconds: Int): String {
     }
 }
 
+
+
 @Composable
 fun SessionTimerOverlay(
     appName: String,
-    durationSeconds: Int
+    remainingSeconds: Int,
+    totalSeconds: Int,
+    onDrag: (Float, Float) -> Unit = { _, _ -> },
+    onDismiss: () -> Unit = {},
+    onTick: (Int) -> Unit = {},
+    onTimerExpired: () -> Unit = {}
 ) {
-    var remainingSeconds by remember { mutableStateOf(durationSeconds) }
+    var currentRemainingSec by remember(remainingSeconds) { mutableIntStateOf(remainingSeconds) }
+    var isMinimized by remember { mutableStateOf(false) }
 
-    LaunchedEffect(durationSeconds) {
-        var remaining = durationSeconds
-        remainingSeconds = remaining
+    LaunchedEffect(remainingSeconds) {
+        var remaining = remainingSeconds
+        currentRemainingSec = remaining
         while (remaining > 0) {
             delay(1000)
             remaining--
-            remainingSeconds = remaining
+            currentRemainingSec = remaining
+            onTick(remaining)
         }
+        onTimerExpired()
     }
 
-    Box(
+    Surface(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(top = 42.dp, end = 16.dp),
-        contentAlignment = Alignment.TopEnd
+            .pointerInput(Unit) {
+                detectDragGestures { change, dragAmount ->
+                    change.consume()
+                    onDrag(dragAmount.x, dragAmount.y)
+                }
+            }
+            .shadow(10.dp, RoundedCornerShape(50.dp)),
+        shape = RoundedCornerShape(50.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+        tonalElevation = 8.dp
     ) {
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                text = "Sesi $appName",
-                modifier = Modifier
-                    .background(
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-                        RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)
+        if (isMinimized) {
+            IconButton(
+                onClick = { isMinimized = false },
+                modifier = Modifier.size(42.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Visibility,
+                    contentDescription = "Tampilkan Timer",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DragIndicator,
+                    contentDescription = "Geser Timer",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    modifier = Modifier.size(18.dp)
+                )
+
+                Column {
+                    Text(
+                        text = appName.take(10),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
                     )
-                    .padding(horizontal = 12.dp, vertical = 5.dp),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            CountdownBadge(
-                remainingSeconds = remainingSeconds,
-                totalSeconds = durationSeconds.coerceAtLeast(1)
-            )
+                    Text(
+                        text = formatCountdown(currentRemainingSec),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                IconButton(
+                    onClick = { isMinimized = true },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.VisibilityOff,
+                        contentDescription = "Sembunyikan Timer",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
         }
     }
 }
