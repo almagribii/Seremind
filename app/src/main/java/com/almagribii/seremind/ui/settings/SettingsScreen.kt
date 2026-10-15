@@ -1,5 +1,6 @@
 package com.almagribii.seremind.ui.settings
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -17,10 +18,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.almagribii.seremind.R
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.findViewTreeLifecycleOwner
@@ -54,30 +58,15 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             ProfileCard()
             SettingsGroup("Pengaturan Umum") {
                 SettingRow(Icons.Default.Info, "Durasi jeda default", "${state.defaultDelay} detik") { dialog = "delay" }
-                SettingRow(Icons.Default.Info, "Eskalasi friksi", if (state.escalationFriction) "Aktif" else "Nonaktif") {
-                    viewModel.setToggle("escalation_friction", !state.escalationFriction)
-                }
-                SettingSwitchRow(Icons.Default.Lock, "Mode fokus", state.focusMode) {
-                    viewModel.setToggle("focus_mode", it)
-                }
+
             }
-            SettingsGroup("Jadwal") {
-                SettingRow(Icons.Default.Info, "Jadwal blocking", state.blockingSchedule) { dialog = "schedule" }
-                SettingRow(Icons.Default.Info, "Budget waktu harian", state.dailyBudget) { dialog = "budget" }
-            }
-            SettingsGroup("Notifikasi") {
-                SettingSwitchRow(Icons.Default.Notifications, "Pengingat refleksi", state.reflectionReminder) {
-                    viewModel.setToggle("reflection_reminder", it)
-                }
-                SettingSwitchRow(Icons.Default.Notifications, "Ringkasan mingguan", state.weeklySummary) {
-                    viewModel.setToggle("weekly_summary", it)
-                }
-            }
+
+
             SettingsGroup("Privasi") {
                 SettingSwitchRow(Icons.Default.Lock, "Refleksi jurnal dengan AI", state.aiJournalEnabled) {
                     viewModel.setToggle("ai_journal_enabled", it)
                 }
-                SettingRow(Icons.Default.Lock, "Penyimpanan jurnal", "Jurnal tersimpan lokal; AI hanya aktif dengan izinmu") {
+                SettingRow(Icons.Default.Lock, "Penyimpanan jurnal", "Jurnal tersimpan lokal.") {
                     showPrivacyInfo = true
                 }
                 SettingRow(Icons.Default.Share, "Ekspor data", "Bagikan salinan data lokal") { viewModel.exportData(context) }
@@ -157,13 +146,31 @@ private fun SettingsHeader() {
 
 @Composable
 private fun ProfileCard() {
-    Card(Modifier.fillMaxWidth().offset(y = (-14).dp), RoundedCornerShape(16.dp),
+    Card(
+        modifier = Modifier.fillMaxWidth().offset(y = (-14).dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(5.dp)) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(42.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
-                contentAlignment = Alignment.Center) {
-                Text("S", color = MaterialTheme.colorScheme.onPrimary, fontSize = 20.sp)
+        elevation = CardDefaults.cardElevation(5.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.logo),
+                    contentDescription = "Logo Seremind",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                )
             }
             Column(Modifier.padding(start = 12.dp).weight(1f)) {
                 Text("Teman Seremind", fontWeight = FontWeight.Bold)

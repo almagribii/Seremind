@@ -49,9 +49,22 @@ fun JournalEditorScreen(
                 shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text(text = "Prompt refleksi", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                    Text(text = initialPrompt, style = MaterialTheme.typography.bodyMedium)
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "Pertanyaan Refleksi AI",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 12.sp
+                    )
+                    Text(
+                        text = initialPrompt,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 20.sp
+                    )
                 }
             }
         }

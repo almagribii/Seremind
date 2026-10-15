@@ -32,38 +32,43 @@ class GeminiApiService(private val apiKey: String = "") {
         reason: String?,
         recentEvents: List<GateEvent> = emptyList()
     ): String = withContext(Dispatchers.IO) {
+        val cleanAppName = getReadableAppName(appName)
         if (apiKey.isBlank()) {
-            return@withContext getStaticGateStatement(appName)
+            return@withContext getStaticGateStatement(cleanAppName)
         }
         try {
             withTimeout(3_000) {
                 val history = recentEvents.take(10).joinToString("\n") { event ->
-                    "- alasan: ${event.reason}, hasil: ${event.action}"
-                }.ifBlank { "Belum ada riwayat gate untuk aplikasi ini." }
+                    "- aplikasi: ${getReadableAppName(event.packageName)}, alasan: ${event.reason}, hasil: ${event.action}"
+                }.ifBlank { "Belum ada riwayat." }
                 val previousStatements = recentEvents.mapNotNull { it.aiQuestion }
                     .filter(String::isNotBlank)
                     .distinct()
                     .joinToString(" | ")
                     .ifBlank { "Tidak ada." }
                 val prompt = """
-                    Buat satu pernyataan kesadaran singkat dalam Bahasa Indonesia untuk seseorang
-                    yang hendak membuka aplikasi "$appName". Gunakan konteks riwayat gate berikut:
-                    $history
-                    Pernyataan sebelumnya (jangan menirunya): $previousStatements
-                    Alasan yang baru dipilih: ${reason ?: "belum dipilih"}.
-                    Buat pernyataan yang berbeda, relevan dengan pola riwayat, empatik, netral,
-                    dan tidak menghakimi. Jangan gunakan tanda tanya. Jangan mendiagnosis, jangan
-                    memberi saran medis, dan jangan menyuruh pengguna melakukan tindakan tertentu.
-                    Maksimal 120 karakter.
-                    Variasi permintaan: ${System.currentTimeMillis()}.
-                    Keluarkan hanya pernyataannya.
+                    Buat 1 (satu) pernyataan kesadaran diri singkat dalam Bahasa Indonesia untuk seseorang
+                    yang hendak membuka aplikasi "$cleanAppName".
+
+                    Konteks aktivitas:
+                    - Riwayat gerbang: $history
+                    - Alasan dipilih: ${reason ?: "belum dipilih"}
+                    - Pernyataan yang pernah dipakai sebelumnya (JANGAN ditiru): $previousStatements
+                    - Seed variasi: ${System.currentTimeMillis()}
+
+                    Panduan Kreatif:
+                    - JANGAN gunakan satu templat kaku!
+                    - Buat pernyataan yang hangat, empati, dan menyentuh kesadaran tanpa menghakimi.
+                    - Mendorong pengguna untuk menyadari niatnya sebelum membuka aplikasi.
+                    - Tanpa tanda tanya, tanpa salam, tanpa kata-kata medis/mendiagnosis.
+                    - Maksimal 120 karakter. Keluarkan HANYA teks pernyataannya.
                 """.trimIndent()
                 requestText(prompt)
             }
         } catch (e: Exception) {
             null
         }
-            ?: getStaticGateStatement(appName)
+            ?: getStaticGateStatement(cleanAppName)
     }
 
     private fun requestText(prompt: String): String? {
@@ -100,51 +105,56 @@ class GeminiApiService(private val apiKey: String = "") {
         }
     }
 
-        suspend fun generateJournalFeedback(
-            journalContent: String,
-            gateEvents: List<GateEvent>
-        ): JournalFeedbackResult = withContext(Dispatchers.IO) {
-            if (apiKey.isBlank()) return@withContext JournalFeedbackResult(error = "AI Jurnal belum tersedia karena API key belum dikonfigurasi.")
-            try {
-                withTimeout(15_000) {
-                    val gateSummary = if (gateEvents.isEmpty()) {
-                        "Belum ada aktivitas gate hari ini."
-                    } else {
-                        val appCounts = gateEvents.groupingBy { it.packageName }.eachCount()
-                            .entries.joinToString { "${it.key} ${it.value}x" }
-                        val reasonCounts = gateEvents.groupingBy { it.reason }.eachCount()
-                            .entries.joinToString { "\"${it.key}\" ${it.value}x" }
-                        val hours = gateEvents.groupingBy {
-                            SimpleDateFormat("HH", Locale.getDefault()).format(Date(it.timestamp))
-                        }.eachCount().entries.joinToString { "${it.key}.00 ${it.value}x" }
-                        "Aplikasi: $appCounts. Alasan: $reasonCounts. Jam: $hours."
-                    }
-                    val prompt = """
-                        Beri respons jurnal dalam Bahasa Indonesia dengan tepat dua bagian:
-                        1) satu observasi yang mengutip inti tulisan pengguna dan menghubungkannya
-                        dengan data gate hari ini secara hati-hati;
-                        2) satu pertanyaan lanjutan yang terbuka.
-                        Tulisan pengguna: "$journalContent"
-                        Data gate hari ini: $gateSummary
-                        Gunakan "mungkin" atau "bisa jadi", bukan kepastian. Jangan menghakimi,
-                        mendiagnosis, memberi nasihat medis, memaksa, atau menyarankan tindakan.
-                        Format: satu paragraf singkat berisi observasi lalu pertanyaan. Maksimal 320 karakter.
-                    """.trimIndent()
-                    val response = requestJournalText(prompt)
-                    response.text?.let { JournalFeedbackResult(feedback = it) }
-                        ?: JournalFeedbackResult(
-                            error = response.error ?: "Gemini tidak memberikan respons. Jurnal tetap tersimpan."
-                        )
+    suspend fun generateJournalFeedback(
+        journalContent: String,
+        gateEvents: List<GateEvent>
+    ): JournalFeedbackResult = withContext(Dispatchers.IO) {
+        if (apiKey.isBlank()) return@withContext JournalFeedbackResult(error = "AI Jurnal belum tersedia karena API key belum dikonfigurasi.")
+        try {
+            withTimeout(15_000) {
+                val gateSummary = if (gateEvents.isEmpty()) {
+                    "Belum ada aktivitas gerbang hari ini."
+                } else {
+                    val appCounts = gateEvents.groupingBy { getReadableAppName(it.packageName) }.eachCount()
+                        .entries.joinToString { "${it.key} ${it.value}x" }
+                    val reasonCounts = gateEvents.groupingBy { it.reason }.eachCount()
+                        .entries.joinToString { "\"${it.key}\" ${it.value}x" }
+                    val hours = gateEvents.groupingBy {
+                        SimpleDateFormat("HH", Locale.getDefault()).format(Date(it.timestamp))
+                    }.eachCount().entries.joinToString { "${it.key}.00 ${it.value}x" }
+                    "Aplikasi: $appCounts. Alasan: $reasonCounts. Jam: $hours."
                 }
-            } catch (error: Exception) {
-                JournalFeedbackResult(error = "AI tidak dapat memproses jurnal: ${error.userMessage()}")
+                val prompt = """
+                    Beri respons reflektif terhadap jurnal pengguna dalam Bahasa Indonesia.
+                    Isi jurnal pengguna: "$journalContent"
+                    Aktivitas gerbang hari ini: $gateSummary
+                    Seed variasi: ${System.currentTimeMillis()}
+
+                    Tugasmu (2 bagian singkat):
+                    1) Berikan 1 observasi empatik yang menghubungkan apa yang ditulis pengguna dengan pola layarnya hari ini secara bijak dan ramah.
+                    2) Berikan 1 pertanyaan lanjutan yang terbuka untuk mendalami perasaannya.
+
+                    Pedoman:
+                    - JANGAN gunakan templat kaku atau kalimat hafalan!
+                    - Gunakan kata-kata yang lembut ("mungkin", "tampak seperti", "bisa jadi").
+                    - Jangan menghakimi, mendiagnosis, atau menyuruh secara memaksa.
+                    - Maksimal 300 karakter. HANYA keluarkan respons pendek tersebut.
+                """.trimIndent()
+                val response = requestJournalText(prompt)
+                response.text?.let { JournalFeedbackResult(feedback = it) }
+                    ?: JournalFeedbackResult(
+                        error = response.error ?: "Gemini tidak memberikan respons. Jurnal tetap tersimpan."
+                    )
+            }
+        } catch (error: Exception) {
+            JournalFeedbackResult(error = "AI tidak dapat memproses jurnal: ${error.userMessage()}")
             }
         }
 
     private fun requestJournalText(prompt: String): TextResponse {
         if (apiKey.isBlank()) return TextResponse(error = "API key AI Jurnal belum tersedia di aplikasi.")
         return try {
-            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=$apiKey"
+            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey"
             val body = JSONObject().apply {
                 put("contents", JSONArray().put(JSONObject().apply {
                     put("parts", JSONArray().put(JSONObject().put("text", prompt)))
@@ -226,6 +236,136 @@ class GeminiApiService(private val apiKey: String = "") {
             e.printStackTrace()
         }
         getStaticRecoveryResponse(emotion)
+    }
+
+    suspend fun generateContextualJournalPrompt(
+        gateEvents: List<GateEvent>,
+        latestJournalEntries: List<com.almagribii.seremind.data.local.entity.JournalEntry>
+    ): String = withContext(Dispatchers.IO) {
+        if (apiKey.isBlank()) {
+            return@withContext getFallbackContextualPrompt(gateEvents, latestJournalEntries)
+        }
+        try {
+            withTimeout(12_000) {
+                val gateSummary = if (gateEvents.isEmpty()) {
+                    "Hari ini belum ada catatan pembukaan aplikasi terinterupsi."
+                } else {
+                    val appCounts = gateEvents.groupingBy { it.packageName }.eachCount()
+                    val topApps = appCounts.entries.sortedByDescending { it.value }.take(3)
+                        .joinToString { entry ->
+                            val name = getReadableAppName(entry.key)
+                            val reasons = gateEvents.filter { it.packageName == entry.key }
+                                .groupingBy { it.reason }.eachCount()
+                                .entries.joinToString { "\"${it.key}\" (${it.value}x)" }
+                            "$name (${entry.value}x; alasan: $reasons)"
+                        }
+                    "Ringkasan pembukaan aplikasi hari ini: $topApps. Total interupsi gerbang: ${gateEvents.size}x."
+                }
+
+                val journalSummary = if (latestJournalEntries.isEmpty()) {
+                    "Belum ada entri jurnal sebelumnya."
+                } else {
+                    val latest = latestJournalEntries.first()
+                    "Jurnal terakhir (${SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(latest.timestamp))}, emosi '${latest.emotionTag ?: "netral"}'): \"${latest.content.take(120)}\""
+                }
+
+                val prompt = """
+                    Kamu adalah AI pendamping refleksi diri Seremind yang hangat, perseptif, dan tidak menghakimi.
+                    Analisis data aktivitas layar dan suasana hati pengguna hari ini:
+                    - Aktivitas penggunaan aplikasi hari ini: $gateSummary
+                    - Jurnal & emosi terakhir: $journalSummary
+                    - Seed variasi: ${System.currentTimeMillis()}
+
+                    Tugasmu:
+                    Buat 1 (satu) pertanyaan refleksi pembuka jurnal yang unik, dinamis, dan menggugah kesadaran.
+
+                    Panduan Kreatif (PENTING):
+                    - JANGAN gunakan satu rumus kalimat kaku! Variasikan gaya bahasa dan sudut pandangmu.
+                    - Gunakan nama aplikasi yang ramah dan manusiawi (misal "TikTok", "Instagram", "YouTube"), BUKAN nama paket teknis seperti "trill" atau "android".
+                    - Kamu bisa menyoroti dorongan psikologis di balik kebiasaan hari ini (seperti dorongan mencari distraksi, rasa lelah, atau keinginan terhubung).
+                    - Jika ada pola aplikasi terbanyak atau alasan menonjol, hubungkan secara alami dengan suasana hatinya.
+                    - Buat pertanyaan berbentuk 1-2 kalimat eksploratif yang mengundang pengguna untuk jujur pada dirinya sendiri.
+                    - Tanpa mukadimah, tanpa salam, tanpa tanda kutip di luar. HANYA keluarkan teks pertanyaannya.
+                """.trimIndent()
+
+                val responseText = requestStatsText(prompt)
+                responseText?.trim()?.removeSurrounding("\"")?.takeIf { it.isNotBlank() }
+                    ?: getFallbackContextualPrompt(gateEvents, latestJournalEntries)
+            }
+        } catch (e: Exception) {
+            getFallbackContextualPrompt(gateEvents, latestJournalEntries)
+        }
+    }
+
+    private fun getFallbackContextualPrompt(
+        gateEvents: List<GateEvent>,
+        latestJournalEntries: List<com.almagribii.seremind.data.local.entity.JournalEntry>
+    ): String {
+        if (gateEvents.isNotEmpty()) {
+            val appCounts = gateEvents.groupingBy { it.packageName }.eachCount()
+            val topAppEntry = appCounts.maxByOrNull { it.value }
+            val topAppPkg = topAppEntry?.key ?: ""
+            val topAppName = getReadableAppName(topAppPkg)
+            val totalCount = topAppEntry?.value ?: 1
+
+            val topReason = gateEvents.filter { it.packageName == topAppPkg }
+                .groupingBy { it.reason }.eachCount().maxByOrNull { it.value }
+
+            val reasonName = topReason?.key ?: "alasan tertentu"
+
+            val dynamicGatePrompts = listOf(
+                "Hari ini kamu tampak beberapa kali membuka $topAppName untuk ${reasonName.lowercase()}. Apa yang sebenarnya sedang kamu rasakan saat dorongan itu muncul?",
+                "Ada pola menarik hari ini di mana $topAppName kamu buka hingga $totalCount kali. Kebutuhan apa yang sedang minta diperhatikan di balik kebiasaan ini?",
+                "Setiap kali membuka $topAppName karena $reasonName, momen apa dalam dirimu yang ingin kamu jeda atau hindari?",
+                "Hari ini $topAppName cukup menyita perhatianmu. Jika HP kamu disisihkan sejenak, hal apa yang paling ingin kamu sampaikan pada dirimu saat ini?"
+            )
+            return dynamicGatePrompts.random()
+        }
+
+        if (latestJournalEntries.isNotEmpty()) {
+            val latest = latestJournalEntries.first()
+            val emotion = latest.emotionTag ?: "perasaanmu"
+            val dynamicJournalPrompts = listOf(
+                "Dalam catatan terakhir kamu merasa $emotion. Bagaimana rasa itu berkembang dalam tubuh dan pikiranmu hari ini?",
+                "Kemarin kamu sempat merefleksikan rasa $emotion. Apakah ada hal baru yang kamu pelajari tentang dirimu sejak saat itu?",
+                "Melihat kembali momen saat kamu merasa $emotion, hal apa yang saat ini paling butuh kamu rangkul atau lepaskan?"
+            )
+            return dynamicJournalPrompts.random()
+        }
+
+        val generalPrompts = listOf(
+            "Jika pikiranmu adalah sebuah ruangan yang tenang saat ini, hal apa yang sedang duduk paling depan di sana?",
+            "Apa satu hal berharga yang sempat kamu rasakan atau lewatkan hari ini di luar layar HP?",
+            "Bagaimana kabarmu secara jujur detik ini, ketika semua riuk dunia luar diheningkan sejenak?"
+        )
+        return generalPrompts.random()
+    }
+
+    private fun getReadableAppName(packageName: String): String {
+        val knownApps = mapOf(
+            "com.ss.android.ugc.trill" to "TikTok",
+            "com.zhiliaoapp.musically" to "TikTok",
+            "com.ss.android.ugc.aweme" to "TikTok",
+            "com.instagram.android" to "Instagram",
+            "com.google.android.youtube" to "YouTube",
+            "com.whatsapp" to "WhatsApp",
+            "com.twitter.android" to "X (Twitter)",
+            "com.x.android" to "X (Twitter)",
+            "com.facebook.katana" to "Facebook",
+            "com.facebook.orca" to "Messenger",
+            "com.mobile.legends" to "Mobile Legends",
+            "com.shopee.id" to "Shopee",
+            "com.tokopedia.tkpd" to "Tokopedia"
+        )
+
+        knownApps[packageName.lowercase()]?.let { return it }
+
+        val segments = packageName.split(".")
+        val cleanSegment = segments.lastOrNull { seg ->
+            seg.lowercase() !in listOf("android", "trill", "katana", "orca", "ugc", "ss", "app")
+        } ?: segments.lastOrNull() ?: packageName
+
+        return cleanSegment.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
     }
 
     suspend fun generateJournalPrompt(): String = withContext(Dispatchers.IO) {

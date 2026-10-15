@@ -119,9 +119,15 @@ fun AppsScreen(viewModel: AppsViewModel) {
     }
 
     if (showAppPicker) {
+        LaunchedEffect(Unit) {
+            if (uiState.installedApps.isEmpty()) {
+                viewModel.loadInstalledApps()
+            }
+        }
         AppPickerSheet(
             installedApps = uiState.installedApps,
             targets = uiState.targets,
+            isLoading = uiState.isInstalledAppsLoading,
             searchQuery = pickerSearchQuery,
             onSearchChange = { pickerSearchQuery = it },
             onDismiss = { showAppPicker = false },
@@ -386,6 +392,7 @@ private fun EmptyTargets() {
 private fun AppPickerSheet(
     installedApps: List<com.almagribii.seremind.util.InstalledAppInfo>,
     targets: List<AppTarget>,
+    isLoading: Boolean,
     searchQuery: String,
     onSearchChange: (String) -> Unit,
     onDismiss: () -> Unit,
@@ -393,11 +400,18 @@ private fun AppPickerSheet(
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            Modifier.fillMaxWidth().fillMaxHeight(.85f).padding(horizontal = 16.dp),
+            Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(.85f)
+                .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Pilih aplikasi target", style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text(
+                "Pilih aplikasi target",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = onSearchChange,
@@ -407,30 +421,79 @@ private fun AppPickerSheet(
                 shape = RoundedCornerShape(50.dp),
                 singleLine = true
             )
+
             val apps = installedApps.filter {
                 it.appName.contains(searchQuery, true) || it.packageName.contains(searchQuery, true)
             }
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(bottom = 24.dp)) {
-                items(apps, key = { it.packageName }) { app ->
-                    val added = targets.any { it.packageName == app.packageName }
-                    ListItem(
-                        leadingContent = {
-                            AppIcon(
-                                packageName = app.packageName,
-                                appName = app.appName,
-                                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)),
-                                drawable = app.icon
-                            )
-                        },
-                        headlineContent = { Text(app.appName, fontWeight = FontWeight.Bold) },
-                        supportingContent = { Text(app.packageName, fontSize = 11.sp) },
-                        trailingContent = {
-                            if (added) Text("Ditambahkan", color = MaterialTheme.colorScheme.primary,
-                                fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            else TextButton(onClick = { onAdd(app.packageName, app.appName) }) { Text("Tambah") }
-                        }
+
+            if (isLoading || (installedApps.isEmpty() && apps.isEmpty())) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 3.dp,
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Text(
+                            text = "Memuat daftar aplikasi terinstal...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            } else if (apps.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Aplikasi tidak ditemukan.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
+                }
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 24.dp)
+                ) {
+                    items(apps, key = { it.packageName }) { app ->
+                        val added = targets.any { it.packageName == app.packageName }
+                        ListItem(
+                            leadingContent = {
+                                AppIcon(
+                                    packageName = app.packageName,
+                                    appName = app.appName,
+                                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)),
+                                    drawable = app.icon
+                                )
+                            },
+                            headlineContent = { Text(app.appName, fontWeight = FontWeight.Bold) },
+                            supportingContent = { Text(app.packageName, fontSize = 11.sp) },
+                            trailingContent = {
+                                if (added) Text(
+                                    "Ditambahkan",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                else TextButton(onClick = { onAdd(app.packageName, app.appName) }) { Text("Tambah") }
+                            }
+                        )
+                    }
                 }
             }
         }

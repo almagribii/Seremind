@@ -1,5 +1,6 @@
 package com.almagribii.seremind.ui.onboarding
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -16,11 +17,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.almagribii.seremind.R
 import com.almagribii.seremind.util.PermissionHelper
 import kotlinx.coroutines.launch
 
@@ -171,14 +175,16 @@ fun OnboardingWelcomePage(onStartClick: () -> Unit) {
             modifier = Modifier
                 .size(120.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Lock,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.primary
+            Image(
+                painter = painterResource(R.drawable.logo),
+                contentDescription = "Logo Seremind",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
             )
         }
 
@@ -290,12 +296,7 @@ fun PermissionsPageContent(
                 isGranted = hasOverlay,
                 onClick = onRequestOverlay
             )
-            PermissionCardItem(
-                title = "Notifikasi",
-                description = "Mengirim pengingat refleksi harian",
-                isGranted = true,
-                onClick = {}
-            )
+
         }
 
         Spacer(modifier = Modifier.height(16.dp))

@@ -17,10 +17,11 @@ import kotlinx.coroutines.launch
 data class AppsUiState(
     val targets: List<AppTarget> = emptyList(),
     val installedApps: List<InstalledAppInfo> = emptyList(),
-    val isLoading: Boolean = false
-    ,val selectedTarget: AppTarget? = null
-    ,val selectedEvents: List<GateEvent> = emptyList()
-    ,val showDeleteConfirmation: Boolean = false
+    val isLoading: Boolean = false,
+    val isInstalledAppsLoading: Boolean = false,
+    val selectedTarget: AppTarget? = null,
+    val selectedEvents: List<GateEvent> = emptyList(),
+    val showDeleteConfirmation: Boolean = false
 )
 
 class AppsViewModel(application: Application) : AndroidViewModel(application) {
@@ -43,10 +44,14 @@ class AppsViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun loadInstalledApps() {
+    fun loadInstalledApps() {
         viewModelScope.launch(Dispatchers.IO) {
+            _uiState.value = _uiState.value.copy(isInstalledAppsLoading = true)
             val apps = InstalledAppHelper.getInstalledApps(getApplication())
-            _uiState.value = _uiState.value.copy(installedApps = apps)
+            _uiState.value = _uiState.value.copy(
+                installedApps = apps,
+                isInstalledAppsLoading = false
+            )
         }
     }
 

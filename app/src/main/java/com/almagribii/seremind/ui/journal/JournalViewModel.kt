@@ -20,6 +20,7 @@ data class JournalUiState(
     val entries: List<JournalEntry> = emptyList(),
     val articles: List<Article> = emptyList(),
     val currentPrompt: String? = null,
+    val isPromptLoading: Boolean = false,
     val isLoading: Boolean = false,
     val aiJournalEnabled: Boolean = false,
     val latestFeedback: String? = null,
@@ -149,9 +150,26 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
 
     fun fetchNewPrompt() {
         viewModelScope.launch(Dispatchers.IO) {
-            val prompt = geminiService.generateJournalPrompt()
-            _uiState.value = _uiState.value.copy(currentPrompt = prompt)
+            fetchNewPromptInternal()
         }
+    }
+
+    private suspend fun fetchNewPromptInternal() {
+        _uiState.value = _uiState.value.copy(isPromptLoading = true)
+        val startOfDay = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val gateEventsToday = db.gateEventDao().getEventsSince(startOfDay)
+        val recentEntries = journalDao.getAllEntries().take(3)
+
+        val prompt = geminiService.generateContextualJournalPrompt(gateEventsToday, recentEntries)
+        _uiState.value = _uiState.value.copy(
+            currentPrompt = prompt,
+            isPromptLoading = false
+        )
     }
 
     fun markArticleAsRead(article: Article) {
