@@ -32,45 +32,48 @@ class GeminiApiService(private val apiKey: String = "") {
         if (apiKey.isBlank()) {
             return TextResponse(error = "API key Gemini belum dikonfigurasi di local.properties.")
         }
-        return try {
-            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
-            val body = JSONObject().apply {
-                put("contents", JSONArray().put(JSONObject().apply {
-                    put("parts", JSONArray().put(JSONObject().put("text", prompt)))
-                }))
-            }
-            val request = Request.Builder()
-                .url(url)
-                .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
-                .build()
+        val models = listOf("gemini-2.5-flash", "gemini-2.5-flash")
+        var lastError = "Gagal memuat respons Gemini."
 
-            client.newCall(request).execute().use { response ->
-                val rawBody = response.body?.string().orEmpty()
-                if (!response.isSuccessful) {
-                    val apiMessage = runCatching {
-                        JSONObject(rawBody).optJSONObject("error")?.optString("message")
-                    }.getOrNull().orEmpty()
-                    Log.e("GeminiApiService", "Gemini HTTP ${response.code}: $apiMessage")
-                    return@use TextResponse(
-                        error = "Gemini menolak permintaan (${response.code}): ${apiMessage.ifBlank { "respons server tidak valid" }}"
-                    )
+        for (model in models) {
+            try {
+                val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
+                val body = JSONObject().apply {
+                    put("contents", JSONArray().put(JSONObject().apply {
+                        put("parts", JSONArray().put(JSONObject().put("text", prompt)))
+                    }))
                 }
-                val text = JSONObject(rawBody)
-                    .optJSONArray("candidates")?.takeIf { it.length() > 0 }
-                    ?.getJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts")
-                    ?.takeIf { it.length() > 0 }?.getJSONObject(0)?.optString("text")
-                    ?.trim()?.takeIf { it.isNotBlank() }
+                val request = Request.Builder()
+                    .url(url)
+                    .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                    .build()
 
-                if (text != null) {
-                    TextResponse(text = text)
-                } else {
-                    TextResponse(error = "Format respons Gemini tidak dikenali.")
+                client.newCall(request).execute().use { response ->
+                    val rawBody = response.body?.string().orEmpty()
+                    if (!response.isSuccessful) {
+                        val apiMessage = runCatching {
+                            JSONObject(rawBody).optJSONObject("error")?.optString("message")
+                        }.getOrNull().orEmpty()
+                        Log.e("GeminiApiService", "Gemini $model HTTP ${response.code}: $apiMessage")
+                        lastError = "Gemini menolak permintaan (${response.code}): ${apiMessage.ifBlank { "respons server tidak valid" }}"
+                        return@use
+                    }
+                    val text = JSONObject(rawBody)
+                        .optJSONArray("candidates")?.takeIf { it.length() > 0 }
+                        ?.getJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts")
+                        ?.takeIf { it.length() > 0 }?.getJSONObject(0)?.optString("text")
+                        ?.trim()?.takeIf { it.isNotBlank() }
+
+                    if (text != null) {
+                        return TextResponse(text = text)
+                    }
                 }
+            } catch (error: Exception) {
+                Log.e("GeminiApiService", "Gemini $model connection error", error)
+                lastError = "Koneksi ke Gemini gagal: ${error.userMessage()}"
             }
-        } catch (error: Exception) {
-            Log.e("GeminiApiService", "Gemini connection error", error)
-            TextResponse(error = "Koneksi ke Gemini gagal: ${error.userMessage()}")
         }
+        return TextResponse(error = lastError)
     }
 
     suspend fun generateGateStatement(
@@ -124,34 +127,37 @@ class GeminiApiService(private val apiKey: String = "") {
     ): JournalFeedbackResult = withContext(Dispatchers.IO) {
         if (apiKey.isBlank()) return@withContext JournalFeedbackResult(error = "API key AI Jurnal belum dikonfigurasi di local.properties.")
         try {
-            withTimeout(15_000) {
+            withTimeout(20_000) {
                 val gateSummary = if (gateEvents.isEmpty()) {
-                    "Belum ada aktivitas gerbang hari ini."
+                    "Belum ada aktivitas terinterupsi hari ini."
                 } else {
                     val appCounts = gateEvents.groupingBy { getReadableAppName(it.packageName) }.eachCount()
-                        .entries.joinToString { "${it.key} ${it.value}x" }
+                        .entries.sortedByDescending { it.value }
+                        .joinToString { "${it.key} ${it.value}x" }
                     val reasonCounts = gateEvents.groupingBy { it.reason }.eachCount()
-                        .entries.joinToString { "\"${it.key}\" ${it.value}x" }
-                    val hours = gateEvents.groupingBy {
-                        SimpleDateFormat("HH", Locale.getDefault()).format(Date(it.timestamp))
-                    }.eachCount().entries.joinToString { "${it.key}.00 ${it.value}x" }
-                    "Aplikasi: $appCounts. Alasan: $reasonCounts. Jam: $hours."
+                        .entries.sortedByDescending { it.value }
+                        .joinToString { "\"${it.key}\" (${it.value}x)" }
+                    "Interupsi layar hari ini: $appCounts. Alasan utama: $reasonCounts. Total gerbang: ${gateEvents.size}x."
                 }
+
                 val prompt = """
-                    Beri respons reflektif terhadap jurnal pengguna dalam Bahasa Indonesia.
-                    Isi jurnal pengguna: "$journalContent"
-                    Aktivitas gerbang hari ini: $gateSummary
-                    Seed variasi: ${System.currentTimeMillis()}
+                    Kamu adalah Seremind AI — seorang pendamping refleksi diri dan psiko-edukator kesadaran digital yang sangat empatik, profesional, menenangkan, dan penuh welas asih.
 
-                    Tugasmu (2 bagian singkat):
-                    1) Berikan 1 observasi empatik yang menghubungkan apa yang ditulis pengguna dengan pola layarnya hari ini secara bijak dan ramah.
-                    2) Berikan 1 pertanyaan lanjutan yang terbuka untuk mendalami perasaannya.
+                    Tugasmu:
+                    Baca dan resapi tulisan jurnal pengguna berikut beserta data aktivitas layarnya hari ini:
+                    - Isi Jurnal Pengguna: "$journalContent"
+                    - Ringkasan Aktivitas Layar Hari Ini: $gateSummary
+                    - Seed Variasi: ${System.currentTimeMillis()}
 
-                    Pedoman:
-                    - JANGAN gunakan templat kaku atau kalimat hafalan!
-                    - Gunakan kata-kata yang lembut ("mungkin", "tampak seperti", "bisa jadi").
-                    - Jangan menghakimi, mendiagnosis, atau menyuruh secara memaksa.
-                    - Maksimal 300 karakter. HANYA keluarkan respons pendek tersebut.
+                    Panduan Penyusunan Respons Reflektif (Sangat Penting):
+                    1. **Empati & Pengakuan Perasaan**: Mulailah dengan merangkul dan memvalidasi emosi yang tersirat dari isi tulisan pengguna secara hangat, ramah, dan profesional. Tunjukkan bahwa kamu benar-benar membaca dan memahami apa yang sedang ia alami.
+                    2. **Menghubungkan dengan Pola Layar**: Secara bijak dan lembut (gunakan kata-kata seperti "mungkin", "tampak seperti", "bisa jadi"), hubungkan isi curahan hatinya dengan data pembukaan aplikasi/alasan yang ia pilih hari ini. Tunjukkan hubungan antara suasana hatinya dan dorongan mencari distraksi layar.
+                    3. **Pesan Menenangkan & Pertanyaan Dalam**: Berikan kalimat penguatan yang menenangkan jiwa pengguna bahwa apa yang dirasakannya adalah hal manusiawi. Akhiri dengan SATU pertanyaan refleksi terbuka yang membantu pengguna menyadari kebutuhan sejati hatinya saat ini.
+
+                    Gaya Bahasa:
+                    - Bahasa Indonesia yang santun, hangat, profesional, puitis-reflektif, dan menenangkan.
+                    - Tanpa nada menghakimi, tanpa menggurui, dan tanpa istilah medis/mendiagnosis.
+                    - Panjang respons: 2-3 paragraf singkat yang nyaman dibaca (maksimal 550 karakter). HANYA keluarkan teks respons tersebut.
                 """.trimIndent()
 
                 val response = executeGeminiRequest(prompt)
