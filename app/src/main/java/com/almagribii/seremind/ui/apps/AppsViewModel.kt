@@ -99,8 +99,8 @@ class AppsViewModel(application: Application) : AndroidViewModel(application) {
                     appName = appName,
                     isActive = true,
                     delaySeconds = configuredDelay,
-                    maxSessionMinutes = 0,
-                    cooldownMinutes = 0
+                    maxSessionMinutes = 5, // Default 5 menit sesi
+                    cooldownMinutes = 0     // Default Nonaktif istirahat
                 )
                 appTargetDao.insert(newTarget)
                 loadTargets()

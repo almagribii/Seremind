@@ -33,7 +33,7 @@ class GeminiApiService(private val apiKey: String = "") {
             return TextResponse(error = "API key Gemini belum dikonfigurasi di local.properties.")
         }
         return try {
-            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=$apiKey"
+            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
             val body = JSONObject().apply {
                 put("contents", JSONArray().put(JSONObject().apply {
                     put("parts", JSONArray().put(JSONObject().put("text", prompt)))
