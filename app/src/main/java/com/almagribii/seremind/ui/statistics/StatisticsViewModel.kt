@@ -1,19 +1,35 @@
 package com.almagribii.seremind.ui.statistics
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.almagribii.seremind.BuildConfig
 import com.almagribii.seremind.data.local.SeremindDatabase
 import com.almagribii.seremind.data.local.dao.HourCount
 import com.almagribii.seremind.data.local.dao.ReasonCount
-import com.almagribii.seremind.data.remote.GeminiApiService
+import java.util.Calendar
+import java.util.Locale
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.util.Calendar
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
+
+data class StatisticsAnalogyResult(
+    val analogy: String? = null,
+    val feedback: String? = null,
+    val error: String? = null
+)
 
 data class StatisticsUiState(
     val filterPeriod: String = "Harian", // Harian, Mingguan, Bulanan
@@ -33,9 +49,15 @@ class StatisticsViewModel(application: Application) : AndroidViewModel(applicati
     private val gateDao = db.gateEventDao()
     private val appTargetDao = db.appTargetDao()
 
-    private val apiKey = BuildConfig.GEMINI_API_KEY_JURNAL
+    private val apiKey = BuildConfig.GEMINI_API_KEY
+        .ifEmpty { BuildConfig.GEMINI_API_KEY_JURNAL }
         .ifEmpty { BuildConfig.GEMINI_API_KEY_OVERLAY }
-    private val geminiService = GeminiApiService(apiKey)
+
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .callTimeout(15, TimeUnit.SECONDS)
+        .build()
 
     private val _uiState = MutableStateFlow(StatisticsUiState())
     val uiState: StateFlow<StatisticsUiState> = _uiState.asStateFlow()
@@ -118,12 +140,12 @@ class StatisticsViewModel(application: Application) : AndroidViewModel(applicati
                 .ifBlank { "Tidak terdeteksi transisi beruntun antar aplikasi" }
 
             val analogyResult = if (currentTotal == 0) {
-                GeminiApiService.StatisticsAnalogyResult(
+                StatisticsAnalogyResult(
                     analogy = "Belum ada aktivitas gate yang tercatat pada periode $period.",
                     feedback = "Gunakan aplikasi target secara teratur agar Seremind dapat menganalisis pola dan memberikan saran untukmu."
                 )
             } else {
-                geminiService.generateStatisticsAnalogy(
+                generateStatisticsAnalogyInternal(
                     period = period,
                     totalOpened = opened,
                     totalCancelled = cancelled,
@@ -139,6 +161,83 @@ class StatisticsViewModel(application: Application) : AndroidViewModel(applicati
                 aiFeedback = analogyResult.feedback,
                 isAiLoading = false
             )
+        }
+    }
+
+    private suspend fun generateStatisticsAnalogyInternal(
+        period: String,
+        totalOpened: Int,
+        totalCancelled: Int,
+        peakHoursSummary: String,
+        reasonsSummary: String,
+        appsSummary: String,
+        sequencesSummary: String
+    ): StatisticsAnalogyResult = withContext(Dispatchers.IO) {
+        if (apiKey.isBlank()) {
+            return@withContext StatisticsAnalogyResult(error = "API key Gemini belum dikonfigurasi di local.properties.")
+        }
+        try {
+            withTimeout(15_000) {
+                val prompt = """
+                    Analisis data agregat penggunaan aplikasi pengguna selama periode $period berikut:
+                    - Total dibuka: $totalOpened, Total dicegah/dibatalkan: $totalCancelled
+                    - Puncak jam pembukaan: $peakHoursSummary
+                    - Alasan terbanyak: $reasonsSummary
+                    - Aplikasi terbanyak: $appsSummary
+                    - Transisi/urutan antar aplikasi: $sequencesSummary
+                    - Seed variasi: ${System.currentTimeMillis()}
+
+                    Tugasmu:
+                    1) Temukan 1 korelasi/pola psikologis yang menarik atau tersembunyi antara aplikasi, jam sibuk, atau alasan yang menonjol. Sajikan pola ini dalam 1-2 kalimat yang empatik, ramah, dan tajam (tanpa menghakimi).
+                    2) Berikan 1 saran/feedback konkret yang realistis dan dapat dilakukan pengguna ke depan untuk meningkatkan kesadaran digital.
+
+                    Kembalikan HANYA JSON valid dengan format persis berikut (tanpa blok markdown atau teks lain):
+                    {"analogy": "isi korelasi pola 1-2 kalimat", "feedback": "saran/feedback konkret ke depan"}
+                """.trimIndent()
+
+                val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
+                val body = JSONObject().apply {
+                    put("contents", JSONArray().put(JSONObject().apply {
+                        put("parts", JSONArray().put(JSONObject().put("text", prompt)))
+                    }))
+                }
+                val request = Request.Builder()
+                    .url(url)
+                    .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                    .build()
+
+                httpClient.newCall(request).execute().use { response ->
+                    val rawBody = response.body?.string().orEmpty()
+                    if (!response.isSuccessful) {
+                        val apiMessage = runCatching {
+                            JSONObject(rawBody).optJSONObject("error")?.optString("message")
+                        }.getOrNull().orEmpty()
+                        Log.e("StatisticsViewModel", "Gemini HTTP ${response.code}: $apiMessage")
+                        return@use StatisticsAnalogyResult(error = "Gemini Error (${response.code}): ${apiMessage.ifBlank { "respons server tidak valid" }}")
+                    }
+                    val text = JSONObject(rawBody)
+                        .optJSONArray("candidates")?.takeIf { it.length() > 0 }
+                        ?.getJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts")
+                        ?.takeIf { it.length() > 0 }?.getJSONObject(0)?.optString("text")
+                        ?.trim()?.takeIf { it.isNotBlank() }
+
+                    if (text != null) {
+                        val cleanJson = text.replace("```json", "").replace("```", "").trim()
+                        val jsonObject = JSONObject(cleanJson)
+                        val analogy = jsonObject.optString("analogy").trim()
+                        val feedback = jsonObject.optString("feedback").trim()
+                        if (analogy.isNotBlank() && feedback.isNotBlank()) {
+                            return@use StatisticsAnalogyResult(
+                                analogy = analogy,
+                                feedback = feedback
+                            )
+                        }
+                    }
+                    StatisticsAnalogyResult(error = "Format respons AI Statistik tidak dikenali.")
+                }
+            }
+        } catch (e: Exception) {
+            StatisticsAnalogyResult(error = "Gagal memuat analisis AI: ${e.message}")
         }
     }
 
@@ -198,7 +297,7 @@ class StatisticsViewModel(application: Application) : AndroidViewModel(applicati
             packageName.contains("twitter", true) || packageName.contains("x.android", true) -> "X/Twitter"
             packageName.contains("facebook", true) -> "Facebook"
             packageName.contains("telegram", true) -> "Telegram"
-            else -> packageName.substringAfterLast('.').replaceFirstChar { it.uppercase() }
+            else -> packageName.substringAfterLast('.').replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
         }
     }
 }

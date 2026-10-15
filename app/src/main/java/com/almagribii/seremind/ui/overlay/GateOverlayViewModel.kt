@@ -5,8 +5,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.almagribii.seremind.data.local.SeremindDatabase
 import com.almagribii.seremind.data.local.entity.GateEvent
-import com.almagribii.seremind.data.remote.GeminiApiService
-import com.almagribii.seremind.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +25,6 @@ data class GateOverlayUiState(
 class GateOverlayViewModel(application: Application) : AndroidViewModel(application) {
     private val db = SeremindDatabase.getDatabase(application)
     private val gateDao = db.gateEventDao()
-    private val geminiService = GeminiApiService(BuildConfig.GEMINI_API_KEY_OVERLAY)
 
     private val _uiState = MutableStateFlow(GateOverlayUiState())
     val uiState: StateFlow<GateOverlayUiState> = _uiState.asStateFlow()
@@ -43,7 +40,7 @@ class GateOverlayViewModel(application: Application) : AndroidViewModel(applicat
 
         viewModelScope.launch(Dispatchers.IO) {
             val recentEvents = gateDao.getRecentEventsForPackage(packageName)
-            val statement = geminiService.generateGateStatement(appName, null, recentEvents)
+            val statement = generateGateStatementInternal(appName, null, recentEvents)
             _uiState.value = _uiState.value.copy(statement = statement, isLoading = false)
 
             // Start countdown
@@ -67,7 +64,7 @@ class GateOverlayViewModel(application: Application) : AndroidViewModel(applicat
             val event = GateEvent(
                 packageName = state.packageName,
                 timestamp = System.currentTimeMillis(),
-                reason = state.selectedReason ?: "Lainnya",
+                reason = if (action == "cancelled") "Batal Membuka" else (state.selectedReason ?: "Lainnya"),
                 action = action,
                 aiQuestion = state.statement
             )
