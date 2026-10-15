@@ -28,7 +28,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import kotlinx.coroutines.delay
 import com.almagribii.seremind.data.local.entity.AppTarget
 import com.almagribii.seremind.ui.theme.LightMint
 import com.almagribii.seremind.util.AppIcon
@@ -48,6 +51,15 @@ fun AppsScreen(viewModel: AppsViewModel) {
     var searchQuery by remember { mutableStateOf("") }
     var showAppPicker by remember { mutableStateOf(false) }
     var pickerSearchQuery by remember { mutableStateOf("") }
+    val pullToRefreshState = rememberPullToRefreshState()
+
+    if (pullToRefreshState.isRefreshing) {
+        LaunchedEffect(true) {
+            viewModel.loadTargets()
+            delay(600)
+            pullToRefreshState.endRefresh()
+        }
+    }
 
     val filteredTargets = uiState.targets.filter {
         it.appName.contains(searchQuery, ignoreCase = true) ||
@@ -56,7 +68,10 @@ fun AppsScreen(viewModel: AppsViewModel) {
     val groupedTargets = filteredTargets.groupBy { appCategory(it) }
 
     Box(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .nestedScroll(pullToRefreshState.nestedScrollConnection)
     ) {
         Column(Modifier.fillMaxSize()) {
             AppsHeader()
@@ -123,6 +138,11 @@ fun AppsScreen(viewModel: AppsViewModel) {
         ) {
             Icon(Icons.Default.Add, contentDescription = "Tambah aplikasi", modifier = Modifier.size(28.dp))
         }
+
+        PullToRefreshContainer(
+            state = pullToRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 
     if (showAppPicker) {

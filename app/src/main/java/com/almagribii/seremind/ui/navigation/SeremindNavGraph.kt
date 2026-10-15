@@ -51,7 +51,9 @@ sealed class Screen(val route: String, val title: String, val icon: androidx.com
     object Home : Screen("home", "Beranda", Icons.Default.Home)
     object Statistics : Screen("statistics", "Statistik", Icons.Default.BarChart)
     object Apps : Screen("apps", "Aplikasi", Icons.Default.GridView)
-    object Journal : Screen("journal", "Jurnal", Icons.Default.EditNote)
+    object Journal : Screen("journal?tab={tab}", "Jurnal", Icons.Default.EditNote) {
+        fun createRoute(tab: Int = 0) = "journal?tab=$tab"
+    }
     object Settings : Screen("settings", "Pengaturan", Icons.Default.Settings)
     object Onboarding : Screen("onboarding", "Onboarding", Icons.Default.Home)
     object GateOverlay : Screen("gate_overlay/{packageName}/{appName}/{delaySeconds}", "Overlay", Icons.Default.Home) {
@@ -82,7 +84,7 @@ fun SeremindNavGraph(startDestination: String = Screen.Home.route) {
         Screen.Settings
     )
 
-    val showBottomBar = bottomNavScreens.any { it.route == currentRoute }
+    val showBottomBar = bottomNavScreens.any { it.route.substringBefore("?") == currentRoute?.substringBefore("?") }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -103,7 +105,10 @@ fun SeremindNavGraph(startDestination: String = Screen.Home.route) {
                         navController.navigate(Screen.JournalEditor.createRoute(prompt))
                     },
                     onNavigateToJournalScreen = {
-                        navController.navigate(Screen.Journal.route)
+                        navController.navigate(Screen.Journal.createRoute(0))
+                    },
+                    onNavigateToArticlesTab = {
+                        navController.navigate(Screen.Journal.createRoute(1))
                     },
                     onNavigateToApps = { navController.navigate(Screen.Apps.route) },
                     onNavigateToStatistics = { navController.navigate(Screen.Statistics.route) }
@@ -124,8 +129,20 @@ fun SeremindNavGraph(startDestination: String = Screen.Home.route) {
                 val vm: SettingsViewModel = viewModel()
                 SettingsScreen(viewModel = vm)
             }
-            composable(Screen.Journal.route) {
+            composable(
+                route = Screen.Journal.route,
+                arguments = listOf(navArgument("tab") {
+                    type = NavType.IntType
+                    defaultValue = 0
+                })
+            ) { backStackEntry ->
+                val initialTabArg = backStackEntry.arguments?.getInt("tab") ?: 0
                 val vm: JournalViewModel = viewModel()
+                LaunchedEffect(initialTabArg) {
+                    if (initialTabArg != 0) {
+                        vm.setSelectedTab(initialTabArg)
+                    }
+                }
                 JournalScreen(
                     viewModel = vm,
                     onNavigateToEditor = { prompt -> navController.navigate(Screen.JournalEditor.createRoute(prompt)) },
@@ -224,7 +241,7 @@ fun SeremindNavGraph(startDestination: String = Screen.Home.route) {
                 screens = bottomNavScreens,
                 currentRoute = currentRoute,
                 onNavigate = { screen ->
-                    if (currentRoute != screen.route) {
+                    if (currentRoute?.substringBefore("?") != screen.route.substringBefore("?")) {
                         if (screen == Screen.Home) {
                             navController.popBackStack(Screen.Home.route, inclusive = false)
                         } else {
@@ -249,7 +266,7 @@ private fun SeremindBottomBar(
     currentRoute: String?,
     onNavigate: (Screen) -> Unit
 ) {
-    val selectedIndex = screens.indexOfFirst { it.route == currentRoute }
+    val selectedIndex = screens.indexOfFirst { it.route.substringBefore("?") == currentRoute?.substringBefore("?") }
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()

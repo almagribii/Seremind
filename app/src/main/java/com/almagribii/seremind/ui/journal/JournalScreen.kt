@@ -24,11 +24,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.almagribii.seremind.data.local.entity.Article
 import com.almagribii.seremind.data.local.entity.JournalEntry
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun JournalScreen(
     viewModel: JournalViewModel,
@@ -37,27 +42,45 @@ fun JournalScreen(
     onNavigateToArticle: (articleId: Int) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var selectedTab by remember { mutableStateOf(0) }
+    val selectedTab = uiState.selectedTab
+    val pullToRefreshState = rememberPullToRefreshState()
 
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        JournalHeader(selectedTab) { selectedTab = it }
-        when (selectedTab) {
-            0 -> JournalEntriesTab(
-                entries = uiState.entries,
-                onNewEntry = { onNavigateToEditor(null) },
-                onEntryClick = { onNavigateToDetail(it.id) },
-                onDeleteEntry = { viewModel.deleteEntry(it) },
-                onAskPrompt = { onNavigateToEditor(uiState.currentPrompt ?: "Apa satu hal yang kamu syukuri hari ini?") },
-                onRequestNewPrompt = { viewModel.fetchNewPrompt() },
-                currentPrompt = uiState.currentPrompt,
-                promptError = uiState.currentPromptError,
-                isPromptLoading = uiState.isPromptLoading
-            )
-            else -> ArticlesTab(uiState.articles, onArticleClick = { onNavigateToArticle(it.id) })
+    if (pullToRefreshState.isRefreshing) {
+        LaunchedEffect(true) {
+            viewModel.loadJournalData()
+            delay(600)
+            pullToRefreshState.endRefresh()
         }
-
     }
 
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(pullToRefreshState.nestedScrollConnection)
+    ) {
+        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            JournalHeader(selectedTab) { viewModel.setSelectedTab(it) }
+            when (selectedTab) {
+                0 -> JournalEntriesTab(
+                    entries = uiState.entries,
+                    onNewEntry = { onNavigateToEditor(null) },
+                    onEntryClick = { onNavigateToDetail(it.id) },
+                    onDeleteEntry = { viewModel.deleteEntry(it) },
+                    onAskPrompt = { onNavigateToEditor(uiState.currentPrompt ?: "Apa satu hal yang kamu syukuri hari ini?") },
+                    onRequestNewPrompt = { viewModel.fetchNewPrompt() },
+                    currentPrompt = uiState.currentPrompt,
+                    promptError = uiState.currentPromptError,
+                    isPromptLoading = uiState.isPromptLoading
+                )
+                else -> ArticlesTab(uiState.articles, onArticleClick = { onNavigateToArticle(it.id) })
+            }
+        }
+
+        PullToRefreshContainer(
+            state = pullToRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
+    }
 }
 
 @Composable

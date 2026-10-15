@@ -23,12 +23,18 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import kotlinx.coroutines.delay
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatisticsScreen(viewModel: StatisticsViewModel, onBack: () -> Unit) {
     val state by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
+    val pullToRefreshState = rememberPullToRefreshState()
     val colors = listOf(
         MaterialTheme.colorScheme.primary,
         MaterialTheme.colorScheme.secondary,
@@ -36,72 +42,91 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onBack: () -> Unit) {
         MaterialTheme.colorScheme.error
     )
 
-    Column(
-        Modifier
+    if (pullToRefreshState.isRefreshing) {
+        LaunchedEffect(true) {
+            viewModel.setFilterPeriod(state.filterPeriod)
+            delay(600)
+            pullToRefreshState.endRefresh()
+        }
+    }
+
+    Box(
+        modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(scrollState)
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .nestedScroll(pullToRefreshState.nestedScrollConnection)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(top = 4.dp, bottom = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .verticalScroll(scrollState)
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali") }
-            Spacer(Modifier.width(4.dp))
-            Text("Statistik", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        }
-
-        PeriodSelector(state.filterPeriod, viewModel::setFilterPeriod)
-
-        AiAnalogyCard(state = state, onRunAi = viewModel::runAiAnalysis)
-
-        StatisticsCard("Pembukaan per Jam") {
-            HourChart(state.hourly)
-        }
-
-        StatisticsCard("Alasan Membuka") {
-            if (state.reasons.isEmpty()) {
-                EmptyChart("Belum ada alasan yang tercatat pada periode ini.")
-            } else {
-                ReasonChart(state.reasons, colors)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(top = 4.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali") }
+                Spacer(Modifier.width(4.dp))
+                Text("Statistik", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             }
-        }
 
-        StatisticsCard("Tren") {
-            val trend = state.trendPercent
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(8.dp))
+            PeriodSelector(state.filterPeriod, viewModel::setFilterPeriod)
+
+            AiAnalogyCard(state = state, onRunAi = viewModel::runAiAnalysis)
+
+            StatisticsCard("Pembukaan per Jam") {
+                HourChart(state.hourly)
+            }
+
+            StatisticsCard("Alasan Membuka") {
+                if (state.reasons.isEmpty()) {
+                    EmptyChart("Belum ada alasan yang tercatat pada periode ini.")
+                } else {
+                    ReasonChart(state.reasons, colors)
+                }
+            }
+
+            StatisticsCard("Tren") {
+                val trend = state.trendPercent
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        when {
+                            trend == null -> "Belum cukup data untuk membandingkan tren."
+                            trend < 0 -> "${-trend}% lebih sedikit dibanding periode sebelumnya."
+                            trend > 0 -> "$trend% lebih banyak dibanding periode sebelumnya."
+                            else -> "Jumlah pembukaan sama dengan periode sebelumnya."
+                        }
+                    )
+                }
+            }
+
+            StatisticsCard("Pola Menarik") {
+                val peak = state.peakHour
+                val reason = state.reasons.firstOrNull()?.reason
                 Text(
                     when {
-                        trend == null -> "Belum cukup data untuk membandingkan tren."
-                        trend < 0 -> "${-trend}% lebih sedikit dibanding periode sebelumnya."
-                        trend > 0 -> "$trend% lebih banyak dibanding periode sebelumnya."
-                        else -> "Jumlah pembukaan sama dengan periode sebelumnya."
-                    }
+                        peak == null -> "Belum ada pola yang dapat dianalisis pada periode ini."
+                        reason == null -> "Pembukaan paling sering terjadi sekitar pukul $peak:00."
+                        else -> "Pembukaan paling sering terjadi sekitar pukul $peak:00, dengan alasan terbanyak \"$reason\"."
+                    },
+                    lineHeight = 22.sp
                 )
             }
+
+            Spacer(Modifier.height(16.dp))
         }
 
-        StatisticsCard("Pola Menarik") {
-            val peak = state.peakHour
-            val reason = state.reasons.firstOrNull()?.reason
-            Text(
-                when {
-                    peak == null -> "Belum ada pola yang dapat dianalisis pada periode ini."
-                    reason == null -> "Pembukaan paling sering terjadi sekitar pukul $peak:00."
-                    else -> "Pembukaan paling sering terjadi sekitar pukul $peak:00, dengan alasan terbanyak \"$reason\"."
-                },
-                lineHeight = 22.sp
-            )
-        }
-
-        Spacer(Modifier.height(16.dp))
+        PullToRefreshContainer(
+            state = pullToRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 }
 

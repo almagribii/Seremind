@@ -35,6 +35,7 @@ data class JournalPromptResult(val prompt: String? = null, val error: String? = 
 data class JournalUiState(
     val entries: List<JournalEntry> = emptyList(),
     val articles: List<Article> = emptyList(),
+    val selectedTab: Int = 0,
     val currentPrompt: String? = null,
     val currentPromptError: String? = null,
     val isPromptLoading: Boolean = false,
@@ -62,6 +63,10 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         loadJournalData()
+    }
+
+    fun setSelectedTab(tabIndex: Int) {
+        _uiState.value = _uiState.value.copy(selectedTab = tabIndex)
     }
 
     fun loadJournalData() {

@@ -31,8 +31,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import com.almagribii.seremind.R
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.findViewTreeLifecycleOwner
@@ -41,17 +44,30 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
     onNavigateToJournal: (String?) -> Unit,
     onNavigateToJournalScreen: () -> Unit,
+    onNavigateToArticlesTab: () -> Unit,
     onNavigateToApps: () -> Unit,
     onNavigateToStatistics: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
     val view = LocalView.current
     val scrollState = rememberScrollState()
+    val pullToRefreshState = rememberPullToRefreshState()
+
+    if (pullToRefreshState.isRefreshing) {
+        LaunchedEffect(true) {
+            viewModel.loadHomeData()
+            delay(600)
+            pullToRefreshState.endRefresh()
+        }
+    }
 
     LaunchedEffect(Unit) { viewModel.loadHomeData() }
     DisposableEffect(view) {
@@ -71,76 +87,89 @@ fun HomeScreen(
         else -> "Selamat malam,"
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
-            .verticalScroll(scrollState),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(pullToRefreshState.nestedScrollConnection)
     ) {
-        Header(greeting, date)
-
         Column(
-            modifier = Modifier.padding(horizontal = 20.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            SummaryCard(total, state.cancelledCount, state.openedCount)
+            Header(greeting, date)
 
-            ShortcutRow(
-                onJournal = { onNavigateToJournal(state.aiPrompt) },
-                onStatistics = onNavigateToStatistics,
-                onApps = onNavigateToApps,
-                onArticles = { onNavigateToJournal(null) }
-            )
-
-            HomeBannerSlider(
-                onWelcome = {},
-                onReflection = onNavigateToJournalScreen,
-                onStatistics = onNavigateToStatistics
-            )
-
-            Text("Momen Paling Rawan", style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            Column(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
-                Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Notifications, null, tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(30.dp))
-                    Spacer(Modifier.width(14.dp))
-                    Column {
-                        Text(if (state.peakHour == "-") "Belum ada data" else state.peakHour,
-                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(
-                            if (state.peakReason == "-") "Belum ada alasan tercatat"
-                            else "Alasan terbanyak: ${state.peakReason}",
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = .7f)
-                        )
+                SummaryCard(total, state.cancelledCount, state.openedCount)
+
+                ShortcutRow(
+                    onJournal = { onNavigateToJournal(state.aiPrompt) },
+                    onStatistics = onNavigateToStatistics,
+                    onApps = onNavigateToApps,
+                    onArticles = onNavigateToArticlesTab
+                )
+
+                HomeBannerSlider(
+                    onWelcome = {},
+                    onReflection = onNavigateToJournalScreen,
+                    onStatistics = onNavigateToStatistics
+                )
+
+                Text("Momen Paling Rawan", style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Notifications, null, tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(30.dp))
+                        Spacer(Modifier.width(14.dp))
+                        Column {
+                            Text(if (state.peakHour == "-") "Belum ada data" else state.peakHour,
+                                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(
+                                if (state.peakReason == "-") "Belum ada alasan tercatat"
+                                else "Alasan terbanyak: ${state.peakReason}",
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = .7f)
+                            )
+                        }
+
                     }
-
                 }
-            }
 
-            Text("Aplikasi Target Aktif", style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold)
-            if (state.activeTargets.isEmpty()) {
-                Text("Belum ada aplikasi target. Tambahkan dari menu Aplikasi.",
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = .6f))
-            } else {
-                state.activeTargets.take(3).forEach { target ->
-                    AppRankItem(target.packageName, target.appName, "${target.delaySeconds}s")
+                Text("Aplikasi Target Aktif", style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold)
+                if (state.activeTargets.isEmpty()) {
+                    Text("Belum ada aplikasi target. Tambahkan dari menu Aplikasi.",
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = .6f))
+                } else {
+                    state.activeTargets.take(3).forEach { target ->
+                        AppRankItem(target.packageName, target.appName, "${target.delaySeconds}s")
+                    }
                 }
-            }
 
-            PermissionNotice(
-                hasUsage = state.hasUsagePermission,
-                hasOverlay = state.hasOverlayPermission,
-                onUsage = viewModel::requestUsagePermission,
-                onOverlay = viewModel::requestOverlayPermission
-            )
-            Spacer(Modifier.height(70.dp))
+                PermissionNotice(
+                    hasUsage = state.hasUsagePermission,
+                    hasOverlay = state.hasOverlayPermission,
+                    onUsage = viewModel::requestUsagePermission,
+                    onOverlay = viewModel::requestOverlayPermission
+                )
+                Spacer(Modifier.height(70.dp))
+            }
         }
+
+        PullToRefreshContainer(
+            state = pullToRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 }
 
