@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -49,6 +50,7 @@ fun JournalScreen(
                 onAskPrompt = { onNavigateToEditor(uiState.currentPrompt ?: "Apa satu hal yang kamu syukuri hari ini?") },
                 onRequestNewPrompt = { viewModel.fetchNewPrompt() },
                 currentPrompt = uiState.currentPrompt,
+                promptError = uiState.currentPromptError,
                 isPromptLoading = uiState.isPromptLoading
             )
             else -> ArticlesTab(uiState.articles, onArticleClick = { onNavigateToArticle(it.id) })
@@ -102,6 +104,7 @@ fun JournalEntriesTab(
     onAskPrompt: () -> Unit,
     onRequestNewPrompt: () -> Unit,
     currentPrompt: String?,
+    promptError: String?,
     isPromptLoading: Boolean
 ) {
     val today = remember { Calendar.getInstance() }
@@ -118,7 +121,8 @@ fun JournalEntriesTab(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
+                        containerColor = if (promptError != null) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                        else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
                     )
                 ) {
                     Column(
@@ -158,6 +162,43 @@ fun JournalEntriesTab(
                                     fontSize = 13.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                            }
+                        } else if (promptError != null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ErrorOutline,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "Gagal Memuat Pertanyaan AI",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+
+                            Text(
+                                text = promptError,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp
+                            )
+
+                            OutlinedButton(
+                                onClick = onRequestNewPrompt,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(40.dp),
+                                shape = RoundedCornerShape(50),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error)
+                            ) {
+                                Text("Coba Lagi", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
                             }
                         } else if (currentPrompt == null) {
                             Row(

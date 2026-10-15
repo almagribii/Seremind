@@ -20,6 +20,7 @@ data class JournalUiState(
     val entries: List<JournalEntry> = emptyList(),
     val articles: List<Article> = emptyList(),
     val currentPrompt: String? = null,
+    val currentPromptError: String? = null,
     val isPromptLoading: Boolean = false,
     val isLoading: Boolean = false,
     val aiJournalEnabled: Boolean = false,
@@ -160,7 +161,10 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private suspend fun fetchNewPromptInternal() {
-        _uiState.value = _uiState.value.copy(isPromptLoading = true)
+        _uiState.value = _uiState.value.copy(
+            isPromptLoading = true,
+            currentPromptError = null
+        )
         val startOfDay = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
@@ -170,9 +174,10 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         val gateEventsToday = db.gateEventDao().getEventsSince(startOfDay)
         val recentEntries = journalDao.getAllEntries().take(3)
 
-        val prompt = geminiService.generateContextualJournalPrompt(gateEventsToday, recentEntries)
+        val result = geminiService.generateContextualJournalPrompt(gateEventsToday, recentEntries)
         _uiState.value = _uiState.value.copy(
-            currentPrompt = prompt,
+            currentPrompt = result.prompt,
+            currentPromptError = result.error,
             isPromptLoading = false
         )
     }
