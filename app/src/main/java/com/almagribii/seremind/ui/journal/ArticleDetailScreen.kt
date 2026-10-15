@@ -1,12 +1,12 @@
 package com.almagribii.seremind.ui.journal
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
@@ -14,9 +14,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.almagribii.seremind.R
+import com.almagribii.seremind.data.local.entity.Article
 
 @Composable
 fun ArticleDetailScreen(
@@ -81,34 +85,32 @@ fun ArticleDetailScreen(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            // Illustration Container
-            Box(
+            // Illustration Banner Image
+            Image(
+                painter = painterResource(getArticleImageRes(article)),
+                contentDescription = article.title,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
+                    .height(200.dp)
                     .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Article,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(64.dp)
-                )
-            }
+            )
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Body Paragraphs
-            Text(
-                text = article.content,
-                style = MaterialTheme.typography.bodyLarge,
-                lineHeight = 26.sp,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            // Body Paragraphs (5 Paragraphs)
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                article.content.split("\n\n").filter(String::isNotBlank).forEach { paragraph ->
+                    Text(
+                        text = paragraph.trim(),
+                        style = MaterialTheme.typography.bodyLarge,
+                        lineHeight = 26.sp,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 

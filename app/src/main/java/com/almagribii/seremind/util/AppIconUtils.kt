@@ -17,8 +17,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.almagribii.seremind.R
 
 @Composable
 fun AppIcon(
@@ -29,10 +31,34 @@ fun AppIcon(
 ) {
     val context = LocalContext.current
     val resolvedDrawable = remember(packageName, drawable) {
-        drawable ?: try {
-            context.packageManager.getApplicationIcon(packageName)
-        } catch (e: Exception) {
-            null
+        if (drawable != null) return@remember drawable
+        val pm = context.packageManager
+        val candidates = when (packageName.lowercase()) {
+            "com.ss.android.ugc.trill" -> listOf("com.ss.android.ugc.trill", "com.zhiliaoapp.musically", "com.ss.android.ugc.aweme")
+            "com.zhiliaoapp.musically" -> listOf("com.zhiliaoapp.musically", "com.ss.android.ugc.trill", "com.ss.android.ugc.aweme")
+            "com.twitter.android" -> listOf("com.twitter.android", "com.x.android")
+            "com.x.android" -> listOf("com.x.android", "com.twitter.android")
+            "com.facebook.katana" -> listOf("com.facebook.katana", "com.facebook.lite")
+            else -> listOf(packageName)
+        }
+        for (pkg in candidates) {
+            try {
+                return@remember pm.getApplicationIcon(pkg)
+            } catch (_: Exception) {}
+        }
+        null
+    }
+
+    val fallbackDrawableRes = remember(packageName, appName) {
+        val lowerPkg = packageName.lowercase()
+        val lowerName = appName.lowercase()
+        when {
+            lowerPkg.contains("trill") || lowerPkg.contains("musically") || lowerName.contains("tiktok") -> R.drawable.ic_brand_tiktok
+            lowerPkg.contains("instagram") || lowerName.contains("instagram") -> R.drawable.ic_brand_instagram
+            lowerPkg.contains("youtube") || lowerName.contains("youtube") -> R.drawable.ic_brand_youtube
+            lowerPkg.contains("twitter") || lowerPkg.contains("x.android") || lowerName.contains("twitter") -> R.drawable.ic_brand_twitter
+            lowerPkg.contains("facebook") || lowerName.contains("facebook") -> R.drawable.ic_brand_facebook
+            else -> null
         }
     }
 
@@ -52,6 +78,12 @@ fun AppIcon(
         }
         Image(
             bitmap = bitmap.asImageBitmap(),
+            contentDescription = appName,
+            modifier = modifier
+        )
+    } else if (fallbackDrawableRes != null) {
+        Image(
+            painter = painterResource(fallbackDrawableRes),
             contentDescription = appName,
             modifier = modifier
         )

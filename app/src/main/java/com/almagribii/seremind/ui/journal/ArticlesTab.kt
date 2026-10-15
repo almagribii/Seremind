@@ -1,5 +1,6 @@
 package com.almagribii.seremind.ui.journal
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -7,7 +8,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -15,10 +15,28 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.almagribii.seremind.R
 import com.almagribii.seremind.data.local.entity.Article
+
+fun getArticleImageRes(article: Article): Int {
+    val resName = article.imageResName?.lowercase() ?: ""
+    val titleLower = article.title.lowercase()
+    return when {
+        resName == "satu" || resName == "1" || titleLower.contains("apa itu dopamin") -> R.drawable.satu
+        resName == "dua" || resName == "2" || titleLower.contains("kebiasaan otomatis") -> R.drawable.dua
+        resName == "tiga" || resName == "3" || titleLower.contains("scroll tanpa sadar") -> R.drawable.tiga
+        resName == "empat" || resName == "4" || titleLower.contains("action prediction error") -> R.drawable.empat
+        resName == "lima" || resName == "5" || titleLower.contains("memblokir tidak cukup") -> R.drawable.lima
+        resName == "enam" || resName == "6" || titleLower.contains("satu detik sebelum") -> R.drawable.enam
+        resName == "tujuh" || resName == "7" || titleLower.contains("emosi di balik") -> R.drawable.tujuh
+        else -> R.drawable.satu
+    }
+}
 
 @Composable
 fun ArticlesTab(
@@ -38,15 +56,6 @@ fun ArticlesTab(
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
-            text = "Artikel",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold,
-            fontSize = 24.sp
-        )
-
-        // Search bar "Cari artikel..."
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
@@ -88,29 +97,23 @@ fun ArticlesTab(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Box(
+                            Image(
+                                painter = painterResource(getArticleImageRes(article)),
+                                contentDescription = article.title,
+                                contentScale = ContentScale.Crop,
                                 modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Article,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
+                                    .size(56.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                            )
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(
                                     text = article.title,
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp
+                                    fontSize = 15.sp
                                 )
                                 Text(
-                                    text = article.content.take(65) + "...",
+                                    text = article.content.replace("\n", " ").take(65) + "...",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                     maxLines = 2

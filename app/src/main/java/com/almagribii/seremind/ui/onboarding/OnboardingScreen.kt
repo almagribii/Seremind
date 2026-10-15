@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.almagribii.seremind.R
+import com.almagribii.seremind.util.AppIcon
 import com.almagribii.seremind.util.PermissionHelper
 import kotlinx.coroutines.launch
 
@@ -431,19 +432,13 @@ fun PresetAppsPage(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
+                            AppIcon(
+                                packageName = app.packageName,
+                                appName = app.appName,
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(40.dp)
                                     .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = app.appName.take(1),
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
+                            )
                             Text(
                                 text = app.appName,
                                 style = MaterialTheme.typography.titleMedium,

@@ -48,9 +48,14 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private suspend fun refreshJournalData() {
+        var articles = articleDao.getAllArticles()
+        if (articles.size != 7 || !articles.any { it.title.contains("Action Prediction Error", ignoreCase = true) }) {
+            SeremindDatabase.prepopulateArticles(articleDao)
+            articles = articleDao.getAllArticles()
+        }
         _uiState.value = _uiState.value.copy(
             entries = journalDao.getAllEntries(),
-            articles = articleDao.getAllArticles(),
+            articles = articles,
             aiJournalEnabled = prefDao.getPreference("ai_journal_enabled") == "true"
         )
     }

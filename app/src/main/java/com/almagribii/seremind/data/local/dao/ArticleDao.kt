@@ -20,4 +20,7 @@ interface ArticleDao {
 
     @Query("SELECT * FROM articles WHERE id = :id LIMIT 1")
     suspend fun getArticleById(id: Int): Article?
+
+    @Query("DELETE FROM articles")
+    suspend fun deleteAll()
 }
