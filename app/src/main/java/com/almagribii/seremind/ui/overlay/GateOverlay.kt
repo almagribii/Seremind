@@ -363,7 +363,7 @@ fun GateOverlay(
                                 }
                             },
                             modifier = Modifier
-                                .weight(1f)
+                                .weight(0.9f)
                                 .height(50.dp),
                             shape = RoundedCornerShape(50),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
@@ -381,14 +381,18 @@ fun GateOverlay(
                                     selectedReason != null &&
                                     (selectedReason != "Lainnya" || customReason.isNotBlank()),
                             modifier = Modifier
-                                .weight(1f)
+                                .weight(1.1f)
                                 .height(50.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                             shape = RoundedCornerShape(50),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                         ) {
                             Text(
-                                text = if (countdownSeconds > 0) "Buka (${countdownSeconds}s)" else "Buka (Maks ${maxSessionMinutes}m)",
-                                fontWeight = FontWeight.Bold
+                                text = if (countdownSeconds > 0) "Buka (${countdownSeconds}s)" else "Buka (${maxSessionMinutes}m)",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }

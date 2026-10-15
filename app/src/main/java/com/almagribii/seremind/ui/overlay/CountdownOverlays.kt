@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -38,8 +39,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -132,40 +133,40 @@ fun SessionTimerOverlay(
     }
 
     Surface(
-        modifier = Modifier
-            .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
-                    change.consume()
-                    onDrag(dragAmount.x, dragAmount.y)
-                }
+        modifier = Modifier.pointerInput(Unit) {
+            detectDragGestures { change, dragAmount ->
+                change.consume()
+                onDrag(dragAmount.x, dragAmount.y)
             }
-            .shadow(10.dp, RoundedCornerShape(50.dp)),
+        },
         shape = RoundedCornerShape(50.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-        tonalElevation = 8.dp
+        color = Color(0xFFECE3D5),
+        border = BorderStroke(1.dp, Color(0xFFCBBBA8)),
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp
     ) {
         if (isMinimized) {
             IconButton(
                 onClick = { isMinimized = false },
-                modifier = Modifier.size(42.dp)
+                modifier = Modifier.size(40.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Visibility,
                     contentDescription = "Tampilkan Timer",
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = Color(0xFF4D3718),
                     modifier = Modifier.size(20.dp)
                 )
             }
         } else {
             Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.DragIndicator,
                     contentDescription = "Geser Timer",
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    tint = Color(0xFF7A6850),
                     modifier = Modifier.size(18.dp)
                 )
 
@@ -174,13 +175,13 @@ fun SessionTimerOverlay(
                         text = appName.take(10),
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = Color(0xFF4D3718)
                     )
                     Text(
                         text = formatCountdown(currentRemainingSec),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = Color(0xFF2D2F31)
                     )
                 }
 
@@ -191,7 +192,7 @@ fun SessionTimerOverlay(
                     Icon(
                         imageVector = Icons.Default.VisibilityOff,
                         contentDescription = "Sembunyikan Timer",
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        tint = Color(0xFF7A6850),
                         modifier = Modifier.size(16.dp)
                     )
                 }
