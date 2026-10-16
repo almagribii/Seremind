@@ -57,11 +57,16 @@ sealed class Screen(val route: String, val title: String, val icon: androidx.com
     object Settings : Screen("settings", "Pengaturan", Icons.Default.Settings)
     object Onboarding : Screen("onboarding", "Onboarding", Icons.Default.Home)
     object GateOverlay : Screen("gate_overlay/{packageName}/{appName}/{delaySeconds}", "Overlay", Icons.Default.Home) {
-        fun createRoute(packageName: String, appName: String, delaySeconds: Int) = "gate_overlay/$packageName/$appName/$delaySeconds"
+        fun createRoute(packageName: String, appName: String, delaySeconds: Int) =
+            "gate_overlay/${android.net.Uri.encode(packageName)}/${android.net.Uri.encode(appName)}/$delaySeconds"
     }
     object Recovery : Screen("recovery", "Pemulihan", Icons.Default.Home)
     object JournalEditor : Screen("journal_editor?prompt={prompt}", "Editor Jurnal", Icons.Default.EditNote) {
-        fun createRoute(prompt: String?) = if (prompt != null) "journal_editor?prompt=$prompt" else "journal_editor"
+        fun createRoute(prompt: String?) = if (!prompt.isNullOrBlank()) {
+            "journal_editor?prompt=${android.net.Uri.encode(prompt)}"
+        } else {
+            "journal_editor"
+        }
     }
     object JournalDetail : Screen("journal_detail/{entryId}", "Detail Jurnal", Icons.Default.Description) {
         fun createRoute(entryId: Int) = "journal_detail/$entryId"
@@ -169,8 +174,10 @@ fun SeremindNavGraph(startDestination: String = Screen.Home.route) {
                     navArgument("delaySeconds") { type = NavType.IntType }
                 )
             ) { backStackEntry ->
-                val packageName = backStackEntry.arguments?.getString("packageName") ?: ""
-                val appName = backStackEntry.arguments?.getString("appName") ?: ""
+                val rawPkg = backStackEntry.arguments?.getString("packageName") ?: ""
+                val rawAppName = backStackEntry.arguments?.getString("appName") ?: ""
+                val packageName = android.net.Uri.decode(rawPkg)
+                val appName = android.net.Uri.decode(rawAppName)
                 val delaySeconds = backStackEntry.arguments?.getInt("delaySeconds") ?: 5
 
                 GateOverlay(
@@ -202,7 +209,8 @@ fun SeremindNavGraph(startDestination: String = Screen.Home.route) {
                     defaultValue = null
                 })
             ) { backStackEntry ->
-                val prompt = backStackEntry.arguments?.getString("prompt")
+                val rawPrompt = backStackEntry.arguments?.getString("prompt")
+                val prompt = rawPrompt?.let { android.net.Uri.decode(it) }
                 val vm: JournalViewModel = viewModel()
                 JournalEditorScreen(
                     viewModel = vm,
@@ -274,7 +282,7 @@ private fun SeremindBottomBar(
             .navigationBarsPadding()
     ) {
         val density = androidx.compose.ui.platform.LocalDensity.current
-        val widthPx = with(density) { maxWidth.toPx() }
+        val widthPx = with(density) { this@BoxWithConstraints.maxWidth.toPx() }
         val itemWidth = widthPx / screens.size
         val targetCenter = if (selectedIndex >= 0) {
             itemWidth * selectedIndex + itemWidth / 2f

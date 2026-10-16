@@ -108,7 +108,7 @@ fun HomeScreen(
                 SummaryCard(total, state.cancelledCount, state.openedCount)
 
                 ShortcutRow(
-                    onJournal = { onNavigateToJournal(state.aiPrompt) },
+                    onJournal = onNavigateToJournalScreen,
                     onStatistics = onNavigateToStatistics,
                     onApps = onNavigateToApps,
                     onArticles = onNavigateToArticlesTab
