@@ -304,19 +304,33 @@ private fun ShortcutRow(
     onJournal: () -> Unit, onStatistics: () -> Unit, onApps: () -> Unit, onArticles: () -> Unit
 ) {
     val items = listOf(
-        Triple(Icons.Default.EditNote, "Jurnal", onJournal),
-        Triple(Icons.Default.BarChart, "Statistik", onStatistics),
-        Triple(Icons.Default.GridView, "Aplikasi", onApps),
-        Triple(Icons.AutoMirrored.Filled.Article, "Artikel", onArticles)
+        Triple(R.drawable.jurnal, "Jurnal", onJournal),
+        Triple(R.drawable.statistic, "Statistik", onStatistics),
+        Triple(R.drawable.app, "Aplikasi", onApps),
+        Triple(R.drawable.artikel, "Artikel", onArticles)
     )
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        items.forEach { (icon, label, action) ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(68.dp)) {
-                IconButton(onClick = action, modifier = Modifier.size(58.dp).clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = .16f))) {
-                    Icon(icon, label, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
-                }
-                Text(label, fontSize = 12.sp, textAlign = TextAlign.Center)
+        items.forEach { (drawableRes, label, action) ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .width(68.dp)
+                    .clickable(onClick = action)
+            ) {
+                Image(
+                    painter = painterResource(drawableRes),
+                    contentDescription = label,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = label,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
             }
         }
     }
