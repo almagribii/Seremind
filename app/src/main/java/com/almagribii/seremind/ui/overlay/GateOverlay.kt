@@ -65,7 +65,7 @@ fun GateOverlay(
     val db = remember { SeremindDatabase.getDatabase(context) }
 
     var isLoading by remember { mutableStateOf(true) }
-    var statement by remember { mutableStateOf("Kamu sedang menyadari niatmu sebelum membuka aplikasi ini.") }
+    var statement by remember { mutableStateOf("Luruskan niat dan ingatlah waktu yang Allah amanahkan padamu.") }
     var selectedReason by remember { mutableStateOf<String?>(null) }
     var customReason by remember { mutableStateOf("") }
     var countdownSeconds by remember { mutableStateOf(delaySeconds) }
@@ -440,7 +440,7 @@ suspend fun generateGateStatementInternal(
                 .joinToString(" | ")
                 .ifBlank { "Tidak ada." }
 
-            val systemPrompt = "Kamu adalah AI pendamping kesadaran Seremind. Tulis HANYA 1 (satu) kalimat pernyataan refleksi kesadaran diri dalam Bahasa Indonesia di dalam tanda kutip. DILARANG menuliskan analisis, Bahasa Inggris, atau proses berpikirmu."
+            val systemPrompt = "Kamu adalah AI pendamping muhasabah dan kesadaran Islami Seremind. Tulis HANYA 1 (satu) kalimat pernyataan refleksi Islami yang hangat, menyejukkan hati, dan menyadarkan pengguna tentang niat serta keberkahan waktu dalam Bahasa Indonesia di dalam tanda kutip. DILARANG menuliskan analisis, Bahasa Inggris, atau proses berpikirmu."
             val userPrompt = """
                 Aplikasi yang hendak dibuka: "$cleanAppName"
                 Riwayat interupsi sebelumnya:
@@ -449,11 +449,11 @@ suspend fun generateGateStatementInternal(
                 Pernyataan sebelumnya (JANGAN ditiru): $previousStatements
                 Seed variasi: ${System.currentTimeMillis()}
 
-                Panduan:
-                - Buat 1 pernyataan singkat, hangat, empati, dan menyentuh kesadaran tanpa menghakimi.
-                - Mendorong pengguna untuk menyadari niatnya secara sadar.
-                - Tanpa tanda tanya, tanpa salam, tanpa kata-kata medis/mendiagnosis.
-                - Tuliskan jawaban akhirmu dalam tanda kutip ganda, contoh: "Saat membuka Al-Qur'an, biarkan hati tenang dan niatmu bersih."
+                Panduan Islami & Reflektif (Sangat Penting):
+                - Buat 1 kalimat refleksi Islami yang singkat, sejuk, empati, dan menggugah muhasabah diri tanpa menghakimi.
+                - Sentuh nilai kebaikan Islami seperti pentingnya lurusnya niat, menjaga keberkahan waktu, amanah usia, ketenangan hati, atau dzikrullah.
+                - Tanpa tanda tanya, tanpa salam (Assalamu'alaikum), tanpa istilah medis/mendiagnosis.
+                - Tuliskan jawaban akhirmu dalam tanda kutip ganda, contoh: "Luruskan niatmu, jadikan setiap waktumu bernilai ibadah dan kebaikan."
                 - Maksimal 100 karakter. HANYA keluarkan teks pernyataannya di dalam tanda kutip.
             """.trimIndent()
 
