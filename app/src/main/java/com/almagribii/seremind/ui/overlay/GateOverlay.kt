@@ -5,6 +5,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -141,6 +143,15 @@ fun GateOverlay(
         }
     }
 
+    val scrollState = rememberScrollState()
+
+    LaunchedEffect(selectedReason) {
+        if (selectedReason == "Lainnya") {
+            delay(100)
+            scrollState.animateScrollTo(scrollState.maxValue)
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -148,11 +159,13 @@ fun GateOverlay(
             .pointerInput(Unit) {
                 detectTapGestures { }
             }
-            .padding(24.dp),
+            .padding(horizontal = 16.dp, vertical = 20.dp),
         contentAlignment = Alignment.Center
     ) {
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 660.dp),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
@@ -181,191 +194,72 @@ fun GateOverlay(
                         .alpha(0.07f)
                 )
 
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.CenterEnd
-                ) {
-
-                }
-
-                AppIcon(
-                    packageName = packageName,
-                    appName = appName,
+                Column(
                     modifier = Modifier
-                        .size(60.dp)
-                        .clip(CircleShape)
-                )
-
-                if (isWarningKick) {
-                    Text(
-                        text = "Batas Waktu Habis",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    Text(
-                        text = warningMessage ?: "Batas waktu sesi telah tercapai! Aplikasi $appName otomatis ditutup untuk menjaga ketenanganmu.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center,
-                        fontSize = 15.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        lineHeight = 22.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = onCancel,
+                        .fillMaxWidth()
+                        .verticalScroll(scrollState)
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    AppIcon(
+                        packageName = packageName,
+                        appName = appName,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
-                        shape = RoundedCornerShape(50),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                    ) {
-                        Text("Mengerti", fontWeight = FontWeight.Bold)
-                    }
-                } else if (effectiveCooldownActive) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
+                            .size(56.dp)
+                            .clip(CircleShape)
+                    )
+
+                    if (isWarningKick) {
                         Text(
-                            text = "Masa Jeda Istirahat Aktif (Sisa ${formatCountdown(cooldownSeconds)})",
-                            style = MaterialTheme.typography.labelMedium,
+                            text = "Batas Waktu Habis",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(10.dp)
+                            color = MaterialTheme.colorScheme.error
                         )
-                    }
-                    Text(
-                        text = "Kamu baru saja menutup $appName. Jika harus membukanya sekarang, sesi dibatasi maksimal 5 menit darurat.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        lineHeight = 20.sp
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-//                    Button(
-//                        onClick = {
-//                            recordAndExecute("opened") {
-//                                onEmergencyOpenAllowed()
-//                            }
-//                        },
-//                        modifier = Modifier
-//                            .fillMaxWidth()
-//                            .height(50.dp),
-//                        shape = RoundedCornerShape(50),
-//                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-//                    ) {
-//                        Text("Buka Darurat 5 Menit", fontWeight = FontWeight.Bold)
-//                    }
-                    OutlinedButton(
-                        onClick = {
-                            recordAndExecute("cancelled") {
-                                onCancel()
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
-                        shape = RoundedCornerShape(50)
-                    ) {
-                        Text("Kembali (Istirahat)", fontWeight = FontWeight.Bold)
-                    }
-                } else {
-                    Text(
-                        text = "Membuka $appName",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    if (isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(36.dp), color = MaterialTheme.colorScheme.primary)
-                    } else {
                         Text(
-                            text = statement,
+                            text = warningMessage ?: "Batas waktu sesi telah tercapai! Aplikasi $appName otomatis ditutup untuk menjaga ketenanganmu.",
                             style = MaterialTheme.typography.bodyLarge,
                             textAlign = TextAlign.Center,
-                            fontSize = 16.sp,
+                            fontSize = 15.sp,
                             color = MaterialTheme.colorScheme.onSurface,
                             lineHeight = 22.sp
                         )
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Text(
-                        text = "Apa yang sebenarnya kamu cari?",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
-                    )
-
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        reasons.forEach { reason ->
-                            val isSelected = selectedReason == reason
-                            OutlinedButton(
-                                onClick = { selectedReason = reason },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp),
-                                shape = RoundedCornerShape(50),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent,
-                                    contentColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                ),
-                                border = BorderStroke(
-                                    width = if (isSelected) 2.dp else 1.dp,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                                )
-                            ) {
-                                Text(
-                                    text = reason,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    fontSize = 14.sp
-                                )
-                            }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = onCancel,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp),
+                            shape = RoundedCornerShape(50),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text("Mengerti", fontWeight = FontWeight.Bold)
                         }
-                    }
-
-                    if (selectedReason == "Lainnya") {
-                        OutlinedTextField(
-                            value = customReason,
-                            onValueChange = { customReason = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Alasan kamu") },
-                            placeholder = { Text("Tulis alasanmu di sini") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(16.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    if (countdownSeconds > 0) {
+                    } else if (effectiveCooldownActive) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Masa Jeda Istirahat Aktif (Sisa ${formatCountdown(cooldownSeconds)})",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
                         Text(
-                            text = "Jeda refleksi: ${formatCountdown(countdownSeconds)}",
+                            text = "Kamu baru saja menutup $appName. Jika harus membukanya sekarang, sesi dibatasi maksimal 5 menit darurat.",
                             style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.secondary
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            lineHeight = 20.sp
                         )
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
+                        Spacer(modifier = Modifier.height(8.dp))
                         OutlinedButton(
                             onClick = {
                                 recordAndExecute("cancelled") {
@@ -373,43 +267,152 @@ fun GateOverlay(
                                 }
                             },
                             modifier = Modifier
-                                .weight(0.9f)
+                                .fillMaxWidth()
                                 .height(50.dp),
-                            shape = RoundedCornerShape(50),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+                            shape = RoundedCornerShape(50)
                         ) {
-                            Text("Batalkan", fontWeight = FontWeight.Bold)
+                            Text("Kembali (Istirahat)", fontWeight = FontWeight.Bold)
                         }
+                    } else {
+                        Text(
+                            text = "Membuka $appName",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
 
-                        Button(
-                            onClick = {
-                                recordAndExecute("opened") {
-                                    onOpenAllowed()
-                                }
-                            },
-                            enabled = isOpenedEnabled &&
-                                    selectedReason != null &&
-                                    (selectedReason != "Lainnya" || customReason.isNotBlank()),
-                            modifier = Modifier
-                                .weight(1.1f)
-                                .height(50.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                            shape = RoundedCornerShape(50),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                        ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(36.dp), color = MaterialTheme.colorScheme.primary)
+                        } else {
                             Text(
-                                text = if (countdownSeconds > 0) "Buka (${countdownSeconds}s)" else "Buka (${maxSessionMinutes}m)",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                maxLines = 1,
-                                softWrap = false
+                                text = statement,
+                                style = MaterialTheme.typography.bodyLarge,
+                                textAlign = TextAlign.Center,
+                                fontSize = 15.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                lineHeight = 21.sp
                             )
                         }
+
+                        Text(
+                            text = "Apa yang sebenarnya kamu cari?",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            reasons.chunked(2).forEach { rowReasons ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    rowReasons.forEach { reason ->
+                                        val isSelected = selectedReason == reason
+                                        OutlinedButton(
+                                            onClick = { selectedReason = reason },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(44.dp),
+                                            shape = RoundedCornerShape(50),
+                                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent,
+                                                contentColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                            ),
+                                            border = BorderStroke(
+                                                width = if (isSelected) 2.dp else 1.dp,
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                            )
+                                        ) {
+                                            Text(
+                                                text = reason,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                fontSize = 13.sp,
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
+                                    if (rowReasons.size == 1) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                }
+                            }
+                        }
+
+                        if (selectedReason == "Lainnya") {
+                            OutlinedTextField(
+                                value = customReason,
+                                onValueChange = { customReason = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("Alasan kamu") },
+                                placeholder = { Text("Tulis alasanmu di sini") },
+                                singleLine = true,
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                        }
+
+                        if (countdownSeconds > 0) {
+                            Text(
+                                text = "Jeda refleksi: ${formatCountdown(countdownSeconds)}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    recordAndExecute("cancelled") {
+                                        onCancel()
+                                    }
+                                },
+                                modifier = Modifier
+                                    .weight(0.9f)
+                                    .height(48.dp),
+                                shape = RoundedCornerShape(50),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text("Batalkan", fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = {
+                                    recordAndExecute("opened") {
+                                        onOpenAllowed()
+                                    }
+                                },
+                                enabled = isOpenedEnabled &&
+                                        selectedReason != null &&
+                                        (selectedReason != "Lainnya" || customReason.isNotBlank()),
+                                modifier = Modifier
+                                    .weight(1.1f)
+                                    .height(48.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                shape = RoundedCornerShape(50),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text(
+                                    text = if (countdownSeconds > 0) "Buka (${countdownSeconds}s)" else "Buka (${maxSessionMinutes}m)",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
+                        }
                     }
-
-
                 }
-            }
             }
         }
     }
