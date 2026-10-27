@@ -251,20 +251,20 @@ fun GateOverlay(
                         lineHeight = 20.sp
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            recordAndExecute("opened") {
-                                onEmergencyOpenAllowed()
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
-                        shape = RoundedCornerShape(50),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                    ) {
-                        Text("Buka Darurat 5 Menit", fontWeight = FontWeight.Bold)
-                    }
+//                    Button(
+//                        onClick = {
+//                            recordAndExecute("opened") {
+//                                onEmergencyOpenAllowed()
+//                            }
+//                        },
+//                        modifier = Modifier
+//                            .fillMaxWidth()
+//                            .height(50.dp),
+//                        shape = RoundedCornerShape(50),
+//                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+//                    ) {
+//                        Text("Buka Darurat 5 Menit", fontWeight = FontWeight.Bold)
+//                    }
                     OutlinedButton(
                         onClick = {
                             recordAndExecute("cancelled") {

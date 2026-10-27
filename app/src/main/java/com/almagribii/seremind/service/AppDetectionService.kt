@@ -323,12 +323,6 @@ class AppDetectionService : Service() {
                                                 lastActiveTimestampMs = System.currentTimeMillis()
                                             )
                                             activeSessions[target.packageName] = session
-                                            val durationMs = target.maxSessionMinutes * 60_000L
-                                            sessionExpirationJob?.cancel()
-                                            sessionExpirationJob = serviceScope.launch {
-                                                delay(durationMs)
-                                                triggerSessionExpired(target.packageName, target.appName, target.maxSessionMinutes, false)
-                                            }
                                             if (target.maxSessionMinutes > 0) {
                                                 OverlayWindowManager.showSessionTimer(
                                                     context = applicationContext,
@@ -359,12 +353,6 @@ class AppDetectionService : Service() {
                                                 lastActiveTimestampMs = System.currentTimeMillis()
                                             )
                                             activeSessions[target.packageName] = session
-                                            val durationMs = 5 * 60_000L
-                                            sessionExpirationJob?.cancel()
-                                            sessionExpirationJob = serviceScope.launch {
-                                                delay(durationMs)
-                                                triggerSessionExpired(target.packageName, target.appName, 5, true)
-                                            }
                                             OverlayWindowManager.showSessionTimer(
                                                 context = applicationContext,
                                                 appName = target.appName,
