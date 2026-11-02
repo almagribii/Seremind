@@ -41,6 +41,7 @@ data class StatisticsUiState(
     val peakHour: String? = null,
     val aiAnalogy: String? = null,
     val aiFeedback: String? = null,
+    val aiError: String? = null,
     val isAiLoading: Boolean = false
 )
 
@@ -49,7 +50,9 @@ class StatisticsViewModel(application: Application) : AndroidViewModel(applicati
     private val gateDao = db.gateEventDao()
     private val appTargetDao = db.appTargetDao()
 
-    private val apiKey = BuildConfig.GEMINI_API_KEY
+    private val apiKey = BuildConfig.GEMINI_API_KEY_STATISTIK
+        .ifEmpty { BuildConfig.GEMINI_API_KEY_STATISTICS }
+        .ifEmpty { BuildConfig.GEMINI_API_KEY }
         .ifEmpty { BuildConfig.GEMINI_API_KEY_JURNAL }
         .ifEmpty { BuildConfig.GEMINI_API_KEY_OVERLAY }
 
@@ -159,6 +162,7 @@ class StatisticsViewModel(application: Application) : AndroidViewModel(applicati
             _uiState.value = _uiState.value.copy(
                 aiAnalogy = analogyResult.analogy,
                 aiFeedback = analogyResult.feedback,
+                aiError = analogyResult.error,
                 isAiLoading = false
             )
         }
@@ -174,7 +178,9 @@ class StatisticsViewModel(application: Application) : AndroidViewModel(applicati
         sequencesSummary: String
     ): StatisticsAnalogyResult = withContext(Dispatchers.IO) {
         if (apiKey.isBlank()) {
-            return@withContext StatisticsAnalogyResult(error = "API key Gemini belum dikonfigurasi di local.properties.")
+            return@withContext StatisticsAnalogyResult(
+                error = "API Key Gemini belum dikonfigurasi di file local.properties. (Kode: KEY_EMPTY)"
+            )
         }
         try {
             withTimeout(15_000) {
@@ -195,7 +201,7 @@ class StatisticsViewModel(application: Application) : AndroidViewModel(applicati
                     {"analogy": "isi korelasi pola 1-2 kalimat", "feedback": "saran/feedback konkret ke depan"}
                 """.trimIndent()
 
-                val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
+                val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=$apiKey"
                 val body = JSONObject().apply {
                     put("contents", JSONArray().put(JSONObject().apply {
                         put("parts", JSONArray().put(JSONObject().put("text", prompt)))
@@ -209,11 +215,15 @@ class StatisticsViewModel(application: Application) : AndroidViewModel(applicati
                 httpClient.newCall(request).execute().use { response ->
                     val rawBody = response.body?.string().orEmpty()
                     if (!response.isSuccessful) {
-                        val apiMessage = runCatching {
-                            JSONObject(rawBody).optJSONObject("error")?.optString("message")
-                        }.getOrNull().orEmpty()
-                        Log.e("StatisticsViewModel", "Gemini HTTP ${response.code}: $apiMessage")
-                        return@use StatisticsAnalogyResult(error = "Gemini Error (${response.code}): ${apiMessage.ifBlank { "respons server tidak valid" }}")
+                        Log.e("StatisticsViewModel", "Gemini HTTP ${response.code}: $rawBody")
+                        val userFriendlyMsg = when (response.code) {
+                            400 -> "API Key Gemini tidak valid atau format permintaan tidak sesuai. (Kode: 400)"
+                            403 -> "Akses layanan Gemini AI ditolak. Mohon periksa kembali API Key kamu. (Kode: 403)"
+                            429 -> "Batas kuota penggunaan AI telah tercapai. Silakan coba beberapa saat lagi. (Kode: 429)"
+                            500, 502, 503, 504 -> "Layanan server AI sedang mengalami gangguan sementara. Silakan coba lagi nanti. (Kode: ${response.code})"
+                            else -> "Gagal menghubungkan ke layanan AI. (Kode: ${response.code})"
+                        }
+                        return@use StatisticsAnalogyResult(error = userFriendlyMsg)
                     }
                     val text = JSONObject(rawBody)
                         .optJSONArray("candidates")?.takeIf { it.length() > 0 }
@@ -223,21 +233,36 @@ class StatisticsViewModel(application: Application) : AndroidViewModel(applicati
 
                     if (text != null) {
                         val cleanJson = text.replace("```json", "").replace("```", "").trim()
-                        val jsonObject = JSONObject(cleanJson)
-                        val analogy = jsonObject.optString("analogy").trim()
-                        val feedback = jsonObject.optString("feedback").trim()
-                        if (analogy.isNotBlank() && feedback.isNotBlank()) {
-                            return@use StatisticsAnalogyResult(
-                                analogy = analogy,
-                                feedback = feedback
-                            )
+                        val jsonObject = runCatching { JSONObject(cleanJson) }.getOrNull()
+                        if (jsonObject != null) {
+                            val analogy = jsonObject.optString("analogy").trim()
+                            val feedback = jsonObject.optString("feedback").trim()
+                            if (analogy.isNotBlank() && feedback.isNotBlank()) {
+                                return@use StatisticsAnalogyResult(
+                                    analogy = analogy,
+                                    feedback = feedback
+                                )
+                            }
                         }
+                        Log.e("StatisticsViewModel", "JSON Parse error for text: $text")
+                        return@use StatisticsAnalogyResult(
+                            error = "Format respons dari layanan AI tidak dapat dibaca dengan benar. (Kode: PARSE_ERR)"
+                        )
                     }
-                    StatisticsAnalogyResult(error = "Format respons AI Statistik tidak dikenali.")
+                    StatisticsAnalogyResult(error = "Layanan AI tidak memberikan respons data. (Kode: EMPTY_RESP)")
                 }
             }
         } catch (e: Exception) {
-            StatisticsAnalogyResult(error = "Gagal memuat analisis AI: ${e.message}")
+            Log.e("StatisticsViewModel", "AI Error Exception", e)
+            val userFriendlyMsg = when (e) {
+                is java.net.UnknownHostException, is java.net.SocketTimeoutException, is java.io.IOException ->
+                    "Koneksi internet bermasalah. Mohon periksa koneksi kamu dan coba lagi. (Kode: NET_ERR)"
+                is kotlinx.coroutines.TimeoutCancellationException ->
+                    "Permintaan analisis AI membutuhkan waktu terlalu lama. Silakan coba lagi. (Kode: TIMEOUT)"
+                else ->
+                    "Terjadi kesalahan yang tidak terduga saat memproses analisis AI. (Kode: UNKNOWN_ERR)"
+            }
+            StatisticsAnalogyResult(error = userFriendlyMsg)
         }
     }
 
@@ -283,6 +308,7 @@ class StatisticsViewModel(application: Application) : AndroidViewModel(applicati
                 peakHour = peak,
                 aiAnalogy = null,
                 aiFeedback = null,
+                aiError = null,
                 isAiLoading = false
             )
         }

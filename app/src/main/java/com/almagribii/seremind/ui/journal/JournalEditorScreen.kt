@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.sp
 fun JournalEditorScreen(
     viewModel: JournalViewModel,
     initialPrompt: String?,
-    onSaved: () -> Unit
+    onSaved: (Int) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var content by remember { mutableStateOf("") }
@@ -131,7 +131,7 @@ fun JournalEditorScreen(
                         emotionTag = selectedEmotion,
                         entryType = if (initialPrompt != null) "daily_prompt" else "free",
                         aiPrompt = initialPrompt,
-                        onComplete = onSaved
+                        onComplete = { newEntryId -> onSaved(newEntryId) }
                     )
                 }
             },

@@ -65,6 +65,12 @@ val generalGeminiApiKey = localProperties.getProperty("GEMINI_API_KEY", "")
     .replace("\\", "\\\\")
     .replace("\"", "\\\"")
 
+val statisticsGeminiApiKey = localProperties.getProperty("GEMINI_API_KEY_STATISTIK", "")
+    .ifEmpty { localProperties.getProperty("GEMINI_API_KEY_STATISTICS", "") }
+    .ifEmpty { generalGeminiApiKey }
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
+
 val overlayGeminiApiKey = localProperties.getProperty("GEMINI_API_KEY_OVERLAY", "")
     .ifEmpty { generalGeminiApiKey }
     .replace("\\", "\\\\")
@@ -81,6 +87,8 @@ val groqApiKey = localProperties.getProperty("GROQ_API_KEY", "")
     .replace("\"", "\\\"")
 
 android.defaultConfig {
+    buildConfigField("String", "GEMINI_API_KEY_STATISTIK", "\"$statisticsGeminiApiKey\"")
+    buildConfigField("String", "GEMINI_API_KEY_STATISTICS", "\"$statisticsGeminiApiKey\"")
     buildConfigField("String", "GEMINI_API_KEY_OVERLAY", "\"$overlayGeminiApiKey\"")
     buildConfigField("String", "GEMINI_API_KEY_JURNAL", "\"$journalGeminiApiKey\"")
     buildConfigField("String", "GEMINI_API_KEY", "\"$generalGeminiApiKey\"")

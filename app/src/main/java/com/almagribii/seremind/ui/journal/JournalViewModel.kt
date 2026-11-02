@@ -100,7 +100,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         emotionTag: String?,
         entryType: String = "free",
         aiPrompt: String? = null,
-        onComplete: () -> Unit = {}
+        onComplete: (Int) -> Unit = {}
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val aiEnabled = prefDao.getPreference("ai_journal_enabled") == "true"
@@ -130,7 +130,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                 null
             }
 
-            journalDao.insert(
+            val insertedId = journalDao.insert(
                 JournalEntry(
                     timestamp = System.currentTimeMillis(),
                     content = content,
@@ -140,13 +140,14 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
                     aiFeedback = feedbackResult?.feedback,
                     aiFeedbackError = feedbackResult?.error
                 )
-            )
+            ).toInt()
+
             refreshJournalData()
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 latestFeedback = feedbackResult?.feedback
             )
-            kotlinx.coroutines.withContext(Dispatchers.Main) { onComplete() }
+            kotlinx.coroutines.withContext(Dispatchers.Main) { onComplete(insertedId) }
         }
     }
 
@@ -221,7 +222,7 @@ class JournalViewModel(application: Application) : AndroidViewModel(application)
         if (apiKey.isBlank()) {
             throw IllegalStateException("API key Gemini belum dikonfigurasi di local.properties.")
         }
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=$apiKey"
         val body = JSONObject().apply {
             put("contents", JSONArray().put(JSONObject().apply {
                 put("parts", JSONArray().put(JSONObject().put("text", prompt)))

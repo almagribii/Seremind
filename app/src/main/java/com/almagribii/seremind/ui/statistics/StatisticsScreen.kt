@@ -176,7 +176,53 @@ private fun AiAnalogyCard(
                 }
             }
 
-            if (state.aiAnalogy == null && !state.isAiLoading) {
+            if (state.aiError != null && !state.isAiLoading) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "Gagal Menganalisis dengan AI",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                        Text(
+                            text = state.aiError,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            lineHeight = 16.sp
+                        )
+                        TextButton(
+                            onClick = onRunAi,
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text(
+                                text = "Coba Lagi",
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            } else if (state.aiAnalogy == null && !state.isAiLoading) {
                 Text(
                     text = "Minta AI menganalisis pola korelasi penggunaan aplikasi dan memberikan saran pada periode ${state.filterPeriod.lowercase()}.",
                     style = MaterialTheme.typography.bodyMedium,

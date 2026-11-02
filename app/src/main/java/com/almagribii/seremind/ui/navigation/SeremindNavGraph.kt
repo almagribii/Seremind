@@ -215,7 +215,11 @@ fun SeremindNavGraph(startDestination: String = Screen.Home.route) {
                 JournalEditorScreen(
                     viewModel = vm,
                     initialPrompt = prompt,
-                    onSaved = { navController.popBackStack() }
+                    onSaved = { newEntryId ->
+                        navController.navigate(Screen.JournalDetail.createRoute(newEntryId)) {
+                            popUpTo(Screen.JournalEditor.route) { inclusive = true }
+                        }
+                    }
                 )
             }
             composable(
