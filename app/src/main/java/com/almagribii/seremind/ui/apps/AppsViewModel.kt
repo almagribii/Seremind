@@ -21,7 +21,8 @@ data class AppsUiState(
     val isInstalledAppsLoading: Boolean = false,
     val selectedTarget: AppTarget? = null,
     val selectedEvents: List<GateEvent> = emptyList(),
-    val showDeleteConfirmation: Boolean = false
+    val showDeleteConfirmation: Boolean = false,
+    val userMessage: String? = null
 )
 
 class AppsViewModel(application: Application) : AndroidViewModel(application) {
@@ -44,6 +45,10 @@ class AppsViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun clearUserMessage() {
+        _uiState.value = _uiState.value.copy(userMessage = null)
+    }
+
     fun loadInstalledApps() {
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = _uiState.value.copy(isInstalledAppsLoading = true)
@@ -56,6 +61,12 @@ class AppsViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleTargetActive(target: AppTarget, isActive: Boolean) {
+        if (!isActive && target.isCooldownActive()) {
+            _uiState.value = _uiState.value.copy(
+                userMessage = "🔒 ${target.appName} sedang dalam masa istirahat (sisa ${target.cooldownMinutesLeft()}m) dan tidak dapat dinonaktifkan!"
+            )
+            return
+        }
         viewModelScope.launch(Dispatchers.IO) {
             val updated = target.copy(isActive = isActive)
             appTargetDao.update(updated)
@@ -72,11 +83,20 @@ class AppsViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateTargetSettings(target: AppTarget, delaySeconds: Int, maxSessionMinutes: Int, cooldownMinutes: Int) {
+        var finalCooldown = cooldownMinutes
+        if (target.isCooldownActive()) {
+            if (cooldownMinutes < target.cooldownMinutes) {
+                finalCooldown = target.cooldownMinutes
+                _uiState.value = _uiState.value.copy(
+                    userMessage = "🔒 Masa istirahat sedang aktif! Waktu istirahat tidak dapat dikurangi atau dinonaktifkan."
+                )
+            }
+        }
         viewModelScope.launch(Dispatchers.IO) {
             val updated = target.copy(
                 delaySeconds = delaySeconds,
                 maxSessionMinutes = maxSessionMinutes,
-                cooldownMinutes = cooldownMinutes
+                cooldownMinutes = finalCooldown
             )
             appTargetDao.update(updated)
             loadTargets()
@@ -120,6 +140,12 @@ class AppsViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun requestDelete(target: AppTarget) {
+        if (target.isCooldownActive()) {
+            _uiState.value = _uiState.value.copy(
+                userMessage = "🔒 Aplikasi ${target.appName} sedang dalam masa istirahat (sisa ${target.cooldownMinutesLeft()}m) dan tidak dapat dihapus!"
+            )
+            return
+        }
         _uiState.value = _uiState.value.copy(selectedTarget = target, showDeleteConfirmation = true)
     }
 
@@ -128,6 +154,13 @@ class AppsViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteTarget(target: AppTarget) {
+        if (target.isCooldownActive()) {
+            _uiState.value = _uiState.value.copy(
+                showDeleteConfirmation = false,
+                userMessage = "🔒 Aplikasi ${target.appName} sedang dalam masa istirahat dan tidak dapat dihapus!"
+            )
+            return
+        }
         viewModelScope.launch(Dispatchers.IO) {
             appTargetDao.delete(target)
             _uiState.value = _uiState.value.copy(

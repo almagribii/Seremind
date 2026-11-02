@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.Timer
@@ -175,6 +176,7 @@ fun AppsScreen(viewModel: AppsViewModel) {
             }
         )
     }
+
     if (uiState.showDeleteConfirmation) {
         AlertDialog(
             onDismissRequest = viewModel::dismissDelete,
@@ -186,6 +188,20 @@ fun AppsScreen(viewModel: AppsViewModel) {
                 }) { Text("Hapus", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = { TextButton(onClick = viewModel::dismissDelete) { Text("Batal") } }
+        )
+    }
+
+    uiState.userMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = viewModel::clearUserMessage,
+            icon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Aplikasi Terkunci") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = viewModel::clearUserMessage) {
+                    Text("Mengerti")
+                }
+            }
         )
     }
 }
@@ -214,25 +230,56 @@ private fun AppTargetRow(
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
+    val isCooldown = target.isCooldownActive()
+    val cooldownLeft = target.cooldownMinutesLeft()
+
     Surface(
-        modifier = Modifier.fillMaxWidth().combinedClickable(
-            onClick = onClick,
-            onLongClick = onLongClick
-        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(14.dp),
-        color = LightMint.copy(alpha = .22f)
+        color = if (isCooldown) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f) else LightMint.copy(alpha = .22f),
+        border = if (isCooldown) BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)) else null
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             AppIcon(
                 packageName = target.packageName,
                 appName = target.appName,
-                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp))
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
             )
-            Column(Modifier.weight(1f).padding(start = 10.dp)) {
-                Text(target.appName, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Column(
+                Modifier
+                    .weight(1f)
+                    .padding(start = 10.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(target.appName, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    if (isCooldown) {
+                        Spacer(Modifier.width(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.error
+                        ) {
+                            Text(
+                                text = "🔒 Istirahat (${cooldownLeft}m)",
+                                color = MaterialTheme.colorScheme.onError,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
                 Text(
                     "Jeda: ${target.delaySeconds}s • Sesi: ${target.maxSessionMinutes.takeIf { it > 0 } ?: "Nonaktif"} • Istirahat: ${target.cooldownMinutes.takeIf { it > 0 } ?: "Nonaktif"}",
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = .68f),
@@ -242,17 +289,19 @@ private fun AppTargetRow(
 
             Switch(
                 checked = target.isActive,
-                onCheckedChange = onToggle,
+                onCheckedChange = { newActive ->
+                    onToggle(newActive)
+                },
+                enabled = !isCooldown,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = MaterialTheme.colorScheme.surface,
-                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                    checkedTrackColor = if (isCooldown) MaterialTheme.colorScheme.error.copy(alpha = 0.6f) else MaterialTheme.colorScheme.primary,
                     uncheckedThumbColor = MaterialTheme.colorScheme.surfaceVariant,
                     uncheckedTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = .45f)
                 )
             )
         }
     }
-
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -270,6 +319,9 @@ private fun AppInteractionDialog(
     var customMaxSession by remember(target) { mutableStateOf(if (target.maxSessionMinutes > 0) target.maxSessionMinutes.toString() else "") }
     var customCooldown by remember(target) { mutableStateOf(if (target.cooldownMinutes > 0) target.cooldownMinutes.toString() else "") }
 
+    val isCooldownActive = target.isCooldownActive()
+    val cooldownLeft = target.cooldownMinutesLeft()
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -284,6 +336,28 @@ private fun AppInteractionDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                if (isCooldownActive) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "Masa Istirahat Aktif (Sisa ${cooldownLeft} menit)\nPengaturan istirahat tidak dapat dikurangi atau dinonaktifkan.",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+
                 Text("Pengaturan Akses & Sesi", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
 
                 // 1. Delay seconds
@@ -331,27 +405,41 @@ private fun AppInteractionDialog(
 
                 // 3. Cooldown Minutes
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Masa jeda istirahat wajib: ${selectedCooldown.takeIf { it > 0 } ?: "Nonaktif"}", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        text = "Masa jeda istirahat wajib: ${selectedCooldown.takeIf { it > 0 } ?: "Nonaktif"}" +
+                                if (isCooldownActive) " (Terkunci)" else "",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (isCooldownActive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                    )
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf(0, 15, 30, 45, 60, 120).forEach { min ->
                             FilterChip(
                                 selected = selectedCooldown == min,
                                 onClick = {
-                                    selectedCooldown = min
-                                    if (min == 0) customCooldown = ""
+                                    if (!isCooldownActive) {
+                                        selectedCooldown = min
+                                        if (min == 0) customCooldown = ""
+                                    }
                                 },
+                                enabled = !isCooldownActive,
                                 label = { Text(if (min == 0) "Nonaktif" else "${min}m", fontSize = 11.sp) }
                             )
                         }
                     }
                     OutlinedTextField(
                         value = customCooldown,
-                        onValueChange = {
-                            customCooldown = it.filter(Char::isDigit)
-                            selectedCooldown = customCooldown.toIntOrNull()?.coerceAtLeast(1) ?: 0
+                        onValueChange = { input ->
+                            if (!isCooldownActive) {
+                                val clean = input.filter(Char::isDigit)
+                                val valInt = clean.toIntOrNull() ?: 0
+                                customCooldown = clean
+                                selectedCooldown = valInt
+                            }
                         },
+                        enabled = !isCooldownActive,
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Atau isi menit sendiri") },
+                        label = { Text(if (isCooldownActive) "Terkunci selama masa istirahat" else "Atau isi menit sendiri") },
                         suffix = { Text("menit") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true
@@ -381,10 +469,12 @@ private fun AppInteractionDialog(
         confirmButton = {
             Button(
                 onClick = {
+                    val maxMin = customMaxSession.toIntOrNull()?.coerceAtLeast(1) ?: selectedMaxSession
+                    val coolMin = if (isCooldownActive) target.cooldownMinutes else (customCooldown.toIntOrNull()?.coerceAtLeast(1) ?: selectedCooldown)
                     onSaveSettings(
                         selectedDelay,
-                        customMaxSession.toIntOrNull()?.coerceAtLeast(1) ?: selectedMaxSession,
-                        customCooldown.toIntOrNull()?.coerceAtLeast(1) ?: selectedCooldown
+                        maxMin,
+                        coolMin
                     )
                     onDismiss()
                 }
